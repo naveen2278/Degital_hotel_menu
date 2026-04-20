@@ -1,5 +1,5 @@
 [build]
-  publish = "."
+  publish = "frontend"
 
 # For a multi-page site (index.html, admin.html, dashboard.html), 
 # we should NOT have a catch-all redirect to index.html.

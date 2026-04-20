@@ -1,10 +1,119 @@
 const SERVER_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? 'http://localhost:5000' : window.location.origin;
 const API_BASE = `${SERVER_URL}/api`;
 let allMenuItems = [];
+let allCategories = [];
 
-// Check if user is logged in
-if (!localStorage.getItem('isAdminLoggedIn')) {
-  window.location.href = 'admin.html';
+document.addEventListener('DOMContentLoaded', () => {
+    // Check if logged in
+    if (localStorage.getItem('isAdminLoggedIn') !== 'true' && window.location.pathname.includes('dashboard')) {
+        window.location.href = 'admin.html';
+        return;
+    }
+
+    loadCategories();
+    loadMenuItems();
+    loadOrders();
+    
+    // Auto-refresh orders every 30 seconds
+    setInterval(loadOrders, 30000);
+
+    // Logout logic
+    const logoutBtn = document.getElementById('logoutBtn');
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', () => {
+            localStorage.removeItem('isAdminLoggedIn');
+            window.location.href = 'admin.html';
+        });
+    }
+
+    const dateInput = document.getElementById('orderDate');
+    if (dateInput) {
+        const today = new Date().toISOString().split('T')[0];
+        dateInput.value = today;
+    }
+
+    // Handle tiered pricing visibility
+    const categorySelect = document.getElementById('category');
+    const tieredContainer = document.getElementById('tieredPriceContainer');
+    if (categorySelect && tieredContainer) {
+      categorySelect.addEventListener('change', () => {
+        const isMultiPrice = ['Grill', 'Tandoori'].includes(categorySelect.value);
+        tieredContainer.style.display = isMultiPrice ? 'grid' : 'none';
+      });
+    }
+
+    const editCategorySelect = document.getElementById('editCategory');
+    const editTieredContainer = document.getElementById('editTieredPriceContainer');
+    if (editCategorySelect && editTieredContainer) {
+      editCategorySelect.addEventListener('change', () => {
+        const isMultiPrice = ['Grill', 'Tandoori'].includes(editCategorySelect.value);
+        editTieredContainer.style.display = isMultiPrice ? 'grid' : 'none';
+      });
+    }
+});
+
+async function loadCategories() {
+  try {
+    const response = await fetch(`${API_BASE}/categories`);
+    const result = await response.json();
+    if (result.success) {
+      allCategories = result.data;
+      populateCategoryDropdowns();
+    } else {
+      alert('Error loading categories from database. Please restart server.');
+    }
+  } catch (error) {
+    console.error('Error loading categories:', error);
+    alert('Could not connect to category API.');
+  }
+}
+
+function populateCategoryDropdowns() {
+  const addSelect = document.getElementById('category');
+  const editSelect = document.getElementById('editCategory');
+  const filterSelect = document.getElementById('adminCategoryFilter');
+
+  if (addSelect) {
+    addSelect.innerHTML = '<option value="" disabled selected>Select Category</option>' + 
+      allCategories.map(c => `<option value="${c.name}">${c.name}</option>`).join('');
+  }
+  if (editSelect) {
+    editSelect.innerHTML = '<option value="" disabled>Select Category</option>' + 
+      allCategories.map(c => `<option value="${c.name}">${c.name}</option>`).join('');
+  }
+  if (filterSelect) {
+    filterSelect.innerHTML = '<option value="All" selected>All Categories</option>' + 
+      allCategories.map(c => `<option value="${c.name}">${c.name}</option>`).join('');
+  }
+}
+
+function toggleAddCategory() {
+  const container = document.getElementById('newCategoryContainer');
+  container.style.display = container.style.display === 'none' ? 'flex' : 'none';
+}
+
+async function saveNewCategory() {
+  const input = document.getElementById('newCategoryName');
+  const name = input.value.trim();
+  if (!name) return;
+
+  try {
+    const response = await fetch(`${API_BASE}/categories`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name })
+    });
+    const result = await response.json();
+    if (result.success) {
+      input.value = '';
+      toggleAddCategory();
+      await loadCategories(); // Refresh lists
+    } else {
+      alert(result.message || 'Error adding category');
+    }
+  } catch (error) {
+    alert('Failed to connect to server');
+  }
 }
 
 // Section Switching
@@ -37,12 +146,31 @@ function switchSection(section) {
   }
 }
 
-// Initial setup for date picker
+// Initial setup
 document.addEventListener('DOMContentLoaded', () => {
     const dateInput = document.getElementById('orderDate');
     if (dateInput) {
         const today = new Date().toISOString().split('T')[0];
         dateInput.value = today;
+    }
+
+    // Handle tiered pricing visibility
+    const categorySelect = document.getElementById('category');
+    const tieredContainer = document.getElementById('tieredPriceContainer');
+    if (categorySelect && tieredContainer) {
+      categorySelect.addEventListener('change', () => {
+        const isMultiPrice = ['Grill', 'Tandoori'].includes(categorySelect.value);
+        tieredContainer.style.display = isMultiPrice ? 'grid' : 'none';
+      });
+    }
+
+    const editCategorySelect = document.getElementById('editCategory');
+    const editTieredContainer = document.getElementById('editTieredPriceContainer');
+    if (editCategorySelect && editTieredContainer) {
+      editCategorySelect.addEventListener('change', () => {
+        const isMultiPrice = ['Grill', 'Tandoori'].includes(editCategorySelect.value);
+        editTieredContainer.style.display = isMultiPrice ? 'grid' : 'none';
+      });
     }
 });
 
@@ -81,39 +209,73 @@ async function loadMenuItems() {
   }
 }
 
+function filterAdminMenu() {
+  const selectedCategory = document.getElementById('adminCategoryFilter').value;
+  if (selectedCategory === 'all') {
+    displayMenuItems(allMenuItems);
+  } else {
+    const filtered = allMenuItems.filter(item => item.category === selectedCategory);
+    displayMenuItems(filtered);
+  }
+}
+
 function displayMenuItems(items) {
   const container = document.getElementById('adminMenuList');
-  
-  if (items.length === 0) {
-    container.innerHTML = '<p style="text-align: center; color: var(--text-muted); padding: 40px;">No dishes in your menu yet.</p>';
+  if (!items || items.length === 0) {
+    container.innerHTML = '<p style="text-align: center; color: var(--text-muted); padding: 40px;">No items found in this section.</p>';
     return;
   }
 
-  container.innerHTML = items.map((item, index) => `
-    <div class="admin-item-card reveal" style="animation-delay: ${index * 0.05}s">
-      <img src="${item.image_path ? SERVER_URL + item.image_path : 'https://via.placeholder.com/100?text=Dish'}" 
-           onerror="this.src='https://via.placeholder.com/100?text=Dish'" 
-           alt="${item.item_name}" class="admin-item-thumb" />
-      <div class="admin-item-info">
-        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 5px;">
-          <h3 style="margin:0;">${item.item_name}</h3>
-          <span style="font-size: 0.75rem; padding: 2px 10px; border-radius: 6px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.3px; 
-            ${item.category === 'Non-Veg' ? 'background: rgba(239, 68, 68, 0.15); color: #fca5a5;' : 
-              item.category === 'Veg' ? 'background: rgba(16, 185, 129, 0.15); color: #6ee7b7;' : 
-              item.category === 'Desserts' ? 'background: rgba(167, 139, 250, 0.15); color: #c4b5fd;' : 
-              item.category === 'Ice Cream' ? 'background: rgba(244, 114, 182, 0.15); color: #fbcfe8;' : 
-              item.category === 'Fresh Juice' ? 'background: rgba(251, 191, 36, 0.15); color: #fde68a;' : 
-              'background: rgba(59, 130, 246, 0.15); color: #93c5fd;'}">
-            ${item.category}
-          </span>
-          ${Number(item.is_special) === 1 ? '<span style="font-size: 0.75rem; padding: 2px 10px; border-radius: 6px; background: rgba(212, 93, 38, 0.2); color: #fb923c; font-weight: 800;">SPECIAL</span>' : ''}
-        </div>
-        <p style="margin: 0 0 10px 0; font-size: 0.85rem; color: var(--text-muted);">${item.description || 'No description'}</p>
-        <div style="font-weight: 700; color: var(--primary);">₹${item.price}</div>
-      </div>
-      <div class="admin-item-actions">
-        <button class="small-btn edit-btn" onclick="editItem(${item.id})">Edit</button>
-        <button class="small-btn delete-btn" onclick="deleteItem(${item.id})">Delete</button>
+  // Refined grouping by category for admin view
+  const categorized = {};
+  items.forEach(item => {
+    if (!categorized[item.category]) categorized[item.category] = [];
+    categorized[item.category].push(item);
+  });
+
+  const categoryOrder = ['Biryani', 'Rice', 'Noodles', 'Grill', 'Tandoori', 'Gravy', 'Starters', 'Main Course'];
+  const sortedCategories = Object.keys(categorized).sort((a, b) => {
+    let indexA = categoryOrder.indexOf(a);
+    let indexB = categoryOrder.indexOf(b);
+    return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
+  });
+
+  container.innerHTML = sortedCategories.map(category => `
+    <div class="category-admin-section reveal" style="margin-bottom: 50px; background: rgba(0,0,0,0.15); padding: 25px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.03);">
+      <h2 style="font-size: 1.4rem; color: var(--primary); margin-bottom: 25px; display: flex; align-items: center; gap: 12px; font-family: 'Outfit';">
+        <span style="display:inline-block; width:6px; height:24px; background:var(--primary); border-radius:4px; box-shadow: 0 0 15px rgba(212, 93, 38, 0.4);"></span>
+        ${category || 'General'}
+        <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: 400; margin-left: auto;">${categorized[category].length} items</span>
+      </h2>
+      <div style="display: grid; gap: 20px;">
+        ${categorized[category].map((item, index) => `
+          <div class="admin-item-card" style="background: rgba(30, 41, 59, 0.4); border-color: rgba(255, 255, 255, 0.05); align-items: center;">
+            ${item.image_path ? `
+            <img src="${SERVER_URL + item.image_path}" 
+                 onerror="this.style.display='none'" 
+                 alt="${item.item_name}" class="admin-item-thumb" />
+            ` : '<div class="admin-item-thumb" style="background: rgba(255,255,255,0.05); display: flex; align-items: center; justify-content: center; font-size: 1.5rem; color: var(--text-muted);">🍽️</div>'}
+            <div class="admin-item-info">
+              <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px; flex-wrap: wrap;">
+                <h3 style="margin:0; font-size: 1.15rem;">${item.item_name}</h3>
+                <span class="badge ${item.food_type === 'Non-Veg' ? 'nonveg' : 'veg'}" style="font-size: 0.65rem; padding: 3px 10px;">${item.food_type || 'Dish'}</span>
+                <span style="font-size: 0.65rem; padding: 3px 10px; border-radius: 6px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.3px; background: rgba(59, 130, 246, 0.15); color: #93c5fd;">${item.category || 'Menu'}</span>
+                ${Number(item.is_special) === 1 ? '<span class="badge special-badge" style="font-size: 0.65rem; padding: 3px 10px;">SPECIAL</span>' : ''}
+              </div>
+              <p style="margin: 0 0 12px 0; font-size: 0.85rem; color: var(--text-muted); line-height: 1.5; max-width: 90%;">${item.description || 'No description provided'}</p>
+              <div style="display: flex; gap: 15px; align-items: baseline;">
+                <div style="font-weight: 800; color: var(--primary); font-size: 1.2rem;">₹${item.price}</div>
+                ${item.price_quarter ? `<div style="font-size: 0.75rem; color: var(--text-muted); background: rgba(255,255,255,0.05); padding: 2px 8px; border-radius: 4px;">Q: ₹${item.price_quarter}</div>` : ''}
+                ${item.price_half ? `<div style="font-size: 0.75rem; color: var(--text-muted); background: rgba(255,255,255,0.05); padding: 2px 8px; border-radius: 4px;">H: ₹${item.price_half}</div>` : ''}
+                ${item.price_full ? `<div style="font-size: 0.75rem; color: var(--text-muted); background: rgba(255,255,255,0.05); padding: 2px 8px; border-radius: 4px;">F: ₹${item.price_full}</div>` : ''}
+              </div>
+            </div>
+            <div class="admin-item-actions">
+              <button class="small-btn edit-btn" onclick="editItem(${item.id})" style="padding: 10px 20px;">Edit</button>
+              <button class="small-btn delete-btn" onclick="deleteItem(${item.id})" style="padding: 10px 20px;">Delete</button>
+            </div>
+          </div>
+        `).join('')}
       </div>
     </div>
   `).join('');
@@ -128,7 +290,11 @@ if (document.getElementById('addItemForm')) {
     formData.append('item_name', document.getElementById('itemName').value.trim());
     formData.append('description', document.getElementById('description').value.trim());
     formData.append('price', parseFloat(document.getElementById('price').value));
+    formData.append('price_quarter', document.getElementById('price_quarter').value ? parseFloat(document.getElementById('price_quarter').value) : '');
+    formData.append('price_half', document.getElementById('price_half').value ? parseFloat(document.getElementById('price_half').value) : '');
+    formData.append('price_full', document.getElementById('price_full').value ? parseFloat(document.getElementById('price_full').value) : '');
     formData.append('category', document.getElementById('category').value);
+    formData.append('food_type', document.getElementById('foodType').value);
     formData.append('is_special', document.getElementById('isSpecial').checked);
     formData.append('is_available', document.getElementById('isAvailable').checked);
     
@@ -232,14 +398,26 @@ function displayOrders(orders) {
                 <div class="status-option" onclick="selectOrderStatus(${order.id}, 'Processing')">
                   <span class="status-dot dot-processing"></span> Processing
                 </div>
+                ${order.order_type === 'Parcel' ? `
+                <div class="status-option" onclick="selectOrderStatus(${order.id}, 'Delivered')">
+                  <span class="status-dot dot-delivered"></span> Delivered
+                </div>
+                ` : ''}
+                ${order.order_type === 'Dine-in' ? `
                 <div class="status-option" onclick="selectOrderStatus(${order.id}, 'Completed')">
                   <span class="status-dot dot-completed"></span> Completed
                 </div>
+                ` : ''}
                 <div class="status-option" onclick="selectOrderStatus(${order.id}, 'Cancelled')">
                   <span class="status-dot dot-cancelled"></span> Cancelled
                 </div>
               </div>
             </div>
+            ${(order.status === 'Completed' || order.status === 'Delivered') ? `
+            <button class="add-item-badge" onclick="printBill(${JSON.stringify(order).replace(/"/g, '&quot;')})" style="background: rgba(59, 130, 246, 0.1) !important; color: #93c5fd !important; border-color: rgba(59, 130, 246, 0.2) !important;">
+              <span>🖨️</span> Bill
+            </button>
+            ` : ''}
             <button class="add-item-badge" onclick="openQuickAdd(${order.id})" title="Add Item">
               <span>➕</span> Item
             </button>
@@ -287,10 +465,129 @@ async function updateOrderStatus(orderId, newStatus) {
     
     if ((await response.json()).success) {
       loadOrders(); // Refresh list to update UI
+      
+      // If completed or delivered, automatically offer to print GST bill
+      if (newStatus === 'Completed' || newStatus === 'Delivered') {
+        const url = `${API_BASE}/orders/admin/all`;
+        const resp = await fetch(url, { headers: { 'x-admin-auth': 'true' } });
+        const resJson = await resp.json();
+        const updatedOrder = resJson.data.find(o => o.id == orderId);
+        if (updatedOrder) printBill(updatedOrder);
+      }
     }
   } catch (error) {
     alert('Error updating status');
   }
+}
+
+// --- GST BILL PRINT LOGIC ---
+function printBill(order) {
+  const items = typeof order.items === 'string' ? JSON.parse(order.items) : order.items;
+  const subtotal = Number(order.total_amount);
+  const gstRate = 2.5; // 2.5% CGST + 2.5% SGST = 5% Total
+  const cgst = (subtotal * gstRate) / 100;
+  const sgst = (subtotal * gstRate) / 100;
+  const grandTotal = subtotal + cgst + sgst;
+  const tableNum = String(order.table_number).replace(/\D/g, '') || order.table_number;
+
+  const printWindow = window.open('', '_blank', 'width=400,height=600');
+  
+  const billHtml = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>NightEat Bill #${order.id}</title>
+      <style>
+        @import url('https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&display=swap');
+        body { 
+          font-family: 'Courier Prime', monospace; 
+          padding: 20px; 
+          color: #000; 
+          max-width: 300px; 
+          margin: 0 auto;
+          font-size: 14px;
+        }
+        .header { text-align: center; border-bottom: 1px dashed #000; padding-bottom: 10px; margin-bottom: 15px; }
+        .rest-name { font-size: 20px; font-weight: bold; margin: 0; }
+        .info { font-size: 12px; margin: 5px 0; }
+        .bill-details { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 12px; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 15px; }
+        th { text-align: left; border-bottom: 1px dashed #000; padding: 5px 0; font-size: 12px; }
+        td { padding: 5px 0; font-size: 13px; }
+        .total-section { border-top: 1px dashed #000; padding-top: 10px; }
+        .total-row { display: flex; justify-content: space-between; margin-bottom: 5px; }
+        .grand-total { font-size: 18px; font-weight: bold; margin-top: 10px; border-top: 2px solid #000; padding-top: 5px; }
+        .footer { text-align: center; margin-top: 30px; font-size: 11px; }
+        @media print { .no-print { display: none; } }
+      </style>
+    </head>
+    <body onload="window.print(); window.close();">
+      <div class="header">
+        <img src="${SERVER_URL}/pagene.png" alt="Logo" style="width: 80px; height: auto; margin-bottom: 10px;" />
+        <h1 class="rest-name">NIGHTEAT</h1>
+        <div class="info">Premium Multi-Cuisine Restaurant</div>
+        <div class="info">GSTIN: 33AAAAA0000A1Z5</div>
+        <div class="info">123, Moonlight Street, Food City</div>
+      </div>
+
+      <div class="bill-details">
+        <div>ORD #${order.id}</div>
+        <div>${new Date(order.created_at).toLocaleDateString()}</div>
+      </div>
+      <div class="bill-details">
+        <div>Type: ${order.order_type}</div>
+        <div>${order.order_type === 'Parcel' ? '' : 'Table: ' + tableNum}</div>
+      </div>
+      ${order.customer_name ? `<div class="info">Customer: ${order.customer_name}</div>` : ''}
+
+      <table>
+        <thead>
+          <tr>
+            <th>Item</th>
+            <th>Qty</th>
+            <th style="text-align: right;">Amt</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${items.map(item => `
+            <tr>
+              <td>${item.item_name}</td>
+              <td>${item.quantity}</td>
+              <td style="text-align: right;">₹${(item.price * item.quantity).toFixed(2)}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+
+      <div class="total-section">
+        <div class="total-row">
+          <span>Subtotal:</span>
+          <span>₹${subtotal.toFixed(2)}</span>
+        </div>
+        <div class="total-row">
+          <span>CGST (2.5%):</span>
+          <span>₹${cgst.toFixed(2)}</span>
+        </div>
+        <div class="total-row">
+          <span>SGST (2.5%):</span>
+          <span>₹${sgst.toFixed(2)}</span>
+        </div>
+        <div class="total-row grand-total">
+          <span>TOTAL:</span>
+          <span>₹${grandTotal.toFixed(2)}</span>
+        </div>
+      </div>
+
+      <div class="footer">
+        <p>Thank you for dining with us!</p>
+        <p>Follow us on Instagram @NightEat</p>
+      </div>
+    </body>
+    </html>
+  `;
+
+  printWindow.document.write(billHtml);
+  printWindow.document.close();
 }
 
 // Custom Dropdown Logic
@@ -308,6 +605,26 @@ function toggleStatusDropdown(orderId, event) {
 function selectOrderStatus(orderId, status) {
   updateOrderStatus(orderId, status);
   document.getElementById(`status-menu-${orderId}`).classList.remove('show');
+}
+
+async function deleteOrder(id) {
+  if (typeof id === 'undefined') return;
+  if (!confirm('Are you sure you want to permanently delete this order?')) return;
+  
+  try {
+    const response = await fetch(`${API_BASE}/orders/admin/${id}`, {
+      method: 'DELETE',
+      headers: { 'x-admin-auth': 'true' }
+    });
+    const result = await response.json();
+    if (result.success) {
+      loadOrders();
+    } else {
+      alert('Error: ' + result.message);
+    }
+  } catch (error) {
+    alert('Server error while deleting order');
+  }
 }
 
 // Close dropdowns when clicking outside
@@ -337,7 +654,16 @@ async function editItem(id) {
         document.getElementById('editItemName').value = item.item_name;
         document.getElementById('editDescription').value = item.description || '';
         document.getElementById('editPrice').value = item.price;
+        document.getElementById('editPriceQuarter').value = item.price_quarter || '';
+        document.getElementById('editPriceHalf').value = item.price_half || '';
+        document.getElementById('editPriceFull').value = item.price_full || '';
         document.getElementById('editCategory').value = item.category;
+        
+        // Update tiered pricing visibility for edit modal
+        const isMultiPrice = ['Grill', 'Tandoori'].includes(item.category);
+        document.getElementById('editTieredPriceContainer').style.display = isMultiPrice ? 'grid' : 'none';
+
+        document.getElementById('editFoodType').value = item.food_type;
         document.getElementById('editIsSpecial').checked = Boolean(Number(item.is_special));
         document.getElementById('editIsAvailable').checked = Boolean(Number(item.is_available));
         document.getElementById('removeImage').checked = false;
@@ -372,7 +698,11 @@ if (document.getElementById('editItemForm')) {
     formData.append('item_name', document.getElementById('editItemName').value.trim());
     formData.append('description', document.getElementById('editDescription').value.trim());
     formData.append('price', parseFloat(document.getElementById('editPrice').value));
+    formData.append('price_quarter', document.getElementById('editPriceQuarter').value ? parseFloat(document.getElementById('editPriceQuarter').value) : '');
+    formData.append('price_half', document.getElementById('editPriceHalf').value ? parseFloat(document.getElementById('editPriceHalf').value) : '');
+    formData.append('price_full', document.getElementById('editPriceFull').value ? parseFloat(document.getElementById('editPriceFull').value) : '');
     formData.append('category', document.getElementById('editCategory').value);
+    formData.append('food_type', document.getElementById('editFoodType').value);
     formData.append('is_special', document.getElementById('editIsSpecial').checked);
     formData.append('is_available', document.getElementById('editIsAvailable').checked);
     
@@ -426,9 +756,17 @@ function openTakeOrderModal() {
   updateNewOrderUI();
   
   const select = document.getElementById('modalItemSelect');
-  select.innerHTML = allMenuItems.map(item => `
-    <option value="${item.id}" data-price="${item.price}" data-name="${item.item_name}">${item.item_name} - ₹${item.price}</option>
-  `).join('');
+  select.innerHTML = allMenuItems.map(item => {
+    // Basic price option
+    let options = `<option value="${item.id}" data-price="${item.price}" data-name="${item.item_name}">${item.item_name} (Single) - ₹${item.price}</option>`;
+    
+    // Add size options if available
+    if (item.price_quarter) options += `<option value="${item.id}" data-size="Quarter" data-price="${item.price_quarter}" data-name="${item.item_name}">${item.item_name} (Quarter) - ₹${item.price_quarter}</option>`;
+    if (item.price_half) options += `<option value="${item.id}" data-size="Half" data-price="${item.price_half}" data-name="${item.item_name}">${item.item_name} (Half) - ₹${item.price_half}</option>`;
+    if (item.price_full) options += `<option value="${item.id}" data-size="Full" data-price="${item.price_full}" data-name="${item.item_name}">${item.item_name} (Full) - ₹${item.price_full}</option>`;
+    
+    return options;
+  }).join('');
   
   document.getElementById('takeOrderModal').style.display = 'flex';
 }
@@ -453,12 +791,16 @@ function addItemToNewOrder() {
   const id = parseInt(selectedOption.value);
   const name = selectedOption.dataset.name;
   const price = parseFloat(selectedOption.dataset.price);
+  const size = selectedOption.dataset.size || null;
   
-  const existing = newOrderItems.find(i => i.id === id);
+  // Use unique key for different sizes of the same item
+  const itemKey = size ? `${id}_${size}` : `${id}`;
+  const existing = newOrderItems.find(i => i.itemKey === itemKey);
+  
   if (existing) {
     existing.quantity += qty;
   } else {
-    newOrderItems.push({ id, name, price, quantity: qty });
+    newOrderItems.push({ id, itemKey, name, price, quantity: qty, size });
   }
   
   updateNewOrderUI();
@@ -479,7 +821,7 @@ function updateNewOrderUI() {
     total += item.price * item.quantity;
     return `
       <div style="display:flex; justify-content:space-between; align-items:center; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.05);">
-        <span>${item.quantity}x ${item.name}</span>
+        <span>${item.quantity}x ${item.name} ${item.size ? `<small style="color:var(--primary); opacity:0.8;">(${item.size})</small>` : ''}</span>
         <div style="display:flex; align-items:center; gap:10px;">
           <span style="color: var(--text-muted);">₹${(item.price * item.quantity).toFixed(2)}</span>
           <button onclick="removeNewOrderItem(${index})" style="background:none; border:none; color:var(--danger); cursor:pointer;">×</button>

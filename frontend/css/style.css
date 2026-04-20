@@ -540,6 +540,18 @@ h2.section-title::after {
   box-shadow: 0 0 0 4px var(--primary-light);
 }
 
+/* Style for placeholders in select elements */
+select:invalid {
+  color: var(--text-muted);
+}
+select option {
+  color: var(--text-main);
+  background: #1e293b;
+}
+select option[value=""][disabled] {
+  display: none;
+}
+
 /* Buttons */
 .primary-btn {
   width: 100%;
@@ -1113,4 +1125,59 @@ h2.section-title::after {
 .add-item-badge:hover {
   background: var(--success) !important;
   color: white !important;
+}
+
+/* Tiered Pricing (Grill & Tandoori) Size Buttons */
+.pricing-options {
+  display: flex;
+  gap: 12px;
+  margin: 18px 0;
+  flex-wrap: wrap;
+}
+
+.size-btn {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text-main);
+  padding: 10px 16px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.3s var(--ease-fluid);
+  font-family: 'Inter', sans-serif;
+  text-align: center;
+  min-width: 85px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.size-btn b, .size-btn strong {
+  font-family: 'Outfit';
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  color: var(--primary);
+  letter-spacing: 1px;
+}
+
+.size-btn span {
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+.size-btn:hover {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: white;
+  transform: translateY(-4px) scale(1.05);
+  box-shadow: 0 10px 20px rgba(212, 93, 38, 0.3);
+}
+
+.size-btn:hover b, .size-btn:hover strong {
+  color: white;
+}
+
+.size-btn:active {
+  transform: translateY(-2px) scale(1);
 }

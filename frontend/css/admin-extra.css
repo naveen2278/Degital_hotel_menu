@@ -38,6 +38,13 @@
     border-color: rgba(239, 68, 68, 0.2);
 }
 
+.status-badge.delivered {
+    color: #a855f7;
+    background: rgba(168, 85, 247, 0.1);
+    border-color: rgba(168, 85, 247, 0.2);
+}
+
+
 .status-badge:hover {
     transform: translateY(-2px);
     background: rgba(255, 255, 255, 0.05);
@@ -110,6 +117,7 @@
 .dot-processing { background: #3b82f6; }
 .dot-completed { background: #10b981; }
 .dot-cancelled { background: #ef4444; }
+.dot-delivered { background: #a855f7; }
 
 .add-btn {
     background: rgba(16, 185, 129, 0.15) !important;

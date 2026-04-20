@@ -74,7 +74,7 @@ router.get('/admin/all', authMiddleware, async (req, res) => {
       o.total_amount, 
       o.status, 
       o.created_at,
-      GROUP_CONCAT(CONCAT(m.item_name, '::', oi.quantity, '::', oi.price, '::', oi.id) SEPARATOR '||') as items_string
+      GROUP_CONCAT(CONCAT(IFNULL(m.item_name, 'Deleted Item'), '::', oi.quantity, '::', oi.price, '::', oi.id) SEPARATOR '||') as items_string
     FROM orders o
     LEFT JOIN order_items oi ON o.id = oi.order_id
     LEFT JOIN menu_items m ON oi.item_id = m.id
@@ -222,6 +222,17 @@ router.delete('/admin/remove-item/:orderItemId', authMiddleware, async (req, res
     res.status(500).json({ success: false, message: 'Server error during removal', error: error.message });
   } finally {
     if (connection) connection.release();
+  }
+});
+
+/* ADMIN: DELETE ENTIRE ORDER */
+router.delete('/admin/:id', authMiddleware, async (req, res) => {
+  const { id } = req.params;
+  try {
+    await db.promise().query('DELETE FROM orders WHERE id = ?', [id]);
+    res.json({ success: true, message: 'Order deleted successfully' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Failed to delete order' });
   }
 });
 

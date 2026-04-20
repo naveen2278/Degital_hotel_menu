@@ -1,0 +1,103 @@
+# NightEat Database Documentation - Update History
+
+This document outlines the database structure and the evolutionary changes made to support the restaurant management system.
+
+## 1. Initial Database Schema (hotel_menu.sql)
+**Purpose:** Defines the core tables for administrators, menu management, and the ordering system.
+
+```sql
+CREATE DATABASE IF NOT EXISTS hotel_menu_system;
+USE hotel_menu_system;
+
+-- Admin table for dashboard access
+CREATE TABLE IF NOT EXISTS admin (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    username VARCHAR(100) NOT NULL UNIQUE,
+    password VARCHAR(255) NOT NULL
+);
+
+-- Menu items table with categories and special flags
+CREATE TABLE IF NOT EXISTS menu_items (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    item_name VARCHAR(150) NOT NULL,
+    description TEXT,
+    price DECIMAL(10,2) NOT NULL,
+    category ENUM('Veg', 'Non-Veg', 'Fresh Juice', 'Soda', 'Ice Cream', 'Desserts') NOT NULL,
+    is_special TINYINT(1) DEFAULT 0,
+    is_available TINYINT(1) DEFAULT 1,
+    image_path VARCHAR(255) DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- Orders table (Initial Version)
+CREATE TABLE IF NOT EXISTS orders (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    table_number VARCHAR(20) NOT NULL,
+    total_amount DECIMAL(10,2) NOT NULL,
+    status ENUM('Pending', 'Processing', 'Completed', 'Cancelled') DEFAULT 'Pending',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Order items link table
+CREATE TABLE IF NOT EXISTS order_items (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    order_id INT NOT NULL,
+    item_id INT NOT NULL,
+    quantity INT NOT NULL,
+    price DECIMAL(10,2) NOT NULL,
+    FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
+    FOREIGN KEY (item_id) REFERENCES menu_items(id)
+);
+```
+
+---
+
+## 2. Schema Expansion (update_schema.js & server.js)
+**Purpose:** Added support for customer identification and order type (Dine-in vs Parcel).
+
+```sql
+-- Adding customer name for personalized service
+ALTER TABLE orders ADD COLUMN customer_name VARCHAR(100) DEFAULT NULL;
+
+-- Adding order type to distinguish between tables and take-away
+ALTER TABLE orders ADD COLUMN order_type ENUM('Dine-in', 'Parcel') DEFAULT 'Dine-in';
+```
+
+---
+
+## 3. Status Management Enhancement
+**Purpose:** Added the 'Delivered' status specifically for Parcel orders to track when food is handed over.
+
+```sql
+-- Updating the status ENUM to include 'Delivered'
+ALTER TABLE orders MODIFY COLUMN status ENUM('Pending', 'Processing', 'Delivered', 'Completed', 'Cancelled') DEFAULT 'Pending';
+```
+
+---
+
+## 6. Image & Media Support
+**Purpose:** Enables the system to store and display dish images.
+
+```sql
+-- Adding image_path to store the location of the dish photo
+ALTER TABLE menu_items ADD COLUMN image_path VARCHAR(255) DEFAULT NULL;
+
+-- Track when the image was last updated
+ALTER TABLE menu_items ADD COLUMN image_uploaded_at TIMESTAMP DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP;
+```
+
+---
+
+## 7. Table Relationships (Simplified)
+- **admin**: Stores credentials for restaurant managers.
+- **menu_items**: The digital menu including prices, images, and special labels.
+- **orders**: Main tracking table for every order placed (Table number, Customer, Total Price).
+- **order_items**: Detailed breakdown of exactly which dishes were ordered in each order (linked to menu_items).
+
+## 8. Automatic Synchronization (server.js logic)
+The backend system now includes a `checkDatabaseSchema()` function that runs on every startup. This ensures that:
+1. All tables exist.
+2. Missing columns (like `customer_name`, `image_path`) are added automatically.
+3. ENUM values (like the 'Delivered' status) are updated across different environments.
+

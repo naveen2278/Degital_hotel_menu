@@ -64,27 +64,30 @@ router.get('/admin/all', authMiddleware, async (req, res) => {
 
 /* ADMIN: ADD NEW MENU ITEM WITH IMAGE */
 router.post('/', authMiddleware, upload.single('image'), async (req, res) => {
-  const { item_name, description, price, category, is_special, is_available } = req.body;
-  const image_path = req.file ? `/uploads/${req.file.filename}` : null;
-  
-  const isSpecialInt = (is_special === 'true' || is_special === true) ? 1 : 0;
-  const isAvailableInt = (is_available === 'true' || is_available === true) ? 1 : 0;
+  const { item_name, description, price, price_quarter, price_half, price_full, category, food_type, is_special, is_available } = req.body;
+  const image_path = req.file ? `/uploads/menu/${req.file.filename}` : null;
 
   const sql = `
-    INSERT INTO menu_items (item_name, description, price, category, is_special, is_available, image_path)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO menu_items (item_name, description, price, price_quarter, price_half, price_full, category, food_type, is_special, is_available, image_path)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `;
+  
+  const values = [
+    item_name, 
+    description, 
+    price, 
+    price_quarter === '' ? null : price_quarter,
+    price_half === '' ? null : price_half,
+    price_full === '' ? null : price_full,
+    category, 
+    food_type || 'Veg', 
+    (is_special === 'true' || is_special === true) ? 1 : 0, 
+    (is_available === 'true' || is_available === true) ? 1 : 0, 
+    image_path
+  ];
 
   try {
-    const [result] = await db.promise().query(sql, [
-      item_name,
-      description,
-      price,
-      category,
-      isSpecialInt,
-      isAvailableInt,
-      image_path
-    ]);
+    const [result] = await db.promise().query(sql, values);
 
     res.json({
       success: true,
@@ -100,38 +103,46 @@ router.post('/', authMiddleware, upload.single('image'), async (req, res) => {
 /* ADMIN: UPDATE MENU ITEM WITH IMAGE */
 router.put('/:id', authMiddleware, upload.single('image'), async (req, res) => {
   const { id } = req.params;
-  const { item_name, description, price, category, is_special, is_available, remove_image } = req.body;
+  const { item_name, description, price, price_quarter, price_half, price_full, category, food_type, is_special, is_available, remove_image } = req.body;
   
+  let image_path = null;
+  if (req.file) {
+    image_path = `/uploads/menu/${req.file.filename}`;
+  }
+
   const isSpecialInt = (is_special === 'true' || is_special === true) ? 1 : 0;
   const isAvailableInt = (is_available === 'true' || is_available === true) ? 1 : 0;
 
   try {
-    // First, get the current item to preserve the image if no new one is uploaded
-    const [currentRows] = await db.promise().query('SELECT image_path FROM menu_items WHERE id = ?', [id]);
-    if (currentRows.length === 0) {
-      return res.status(404).json({ success: false, message: 'Item not found' });
+    let sql, values;
+    if (image_path) {
+      sql = `
+        UPDATE menu_items 
+        SET item_name=?, description=?, price=?, price_quarter=?, price_half=?, price_full=?, category=?, food_type=?, is_special=?, is_available=?, image_path=?
+        WHERE id=?
+      `;
+      values = [item_name, description, price, price_quarter === '' ? null : price_quarter, price_half === '' ? null : price_half, price_full === '' ? null : price_full, category, food_type, isSpecialInt, isAvailableInt, image_path, id];
+    } else if (remove_image === 'true') {
+      sql = `
+        UPDATE menu_items 
+        SET item_name=?, description=?, price=?, price_quarter=?, price_half=?, price_full=?, category=?, food_type=?, is_special=?, is_available=?, image_path=NULL
+        WHERE id=?
+      `;
+      values = [item_name, description, price, price_quarter === '' ? null : price_quarter, price_half === '' ? null : price_half, price_full === '' ? null : price_full, category, food_type, isSpecialInt, isAvailableInt, id];
+    } else {
+      sql = `
+        UPDATE menu_items 
+        SET item_name=?, description=?, price=?, price_quarter=?, price_half=?, price_full=?, category=?, food_type=?, is_special=?, is_available=?
+        WHERE id=?
+      `;
+      values = [item_name, description, price, price_quarter === '' ? null : price_quarter, price_half === '' ? null : price_half, price_full === '' ? null : price_full, category, food_type, isSpecialInt, isAvailableInt, id];
     }
 
-    let finalImagePath = currentRows[0].image_path;
-
-    if (req.file) {
-      finalImagePath = `/uploads/${req.file.filename}`;
-    } else if (remove_image === 'true' || remove_image === true) {
-      finalImagePath = null;
-    }
-
-    const sql = `
-      UPDATE menu_items
-      SET item_name = ?, description = ?, price = ?, category = ?, is_special = ?, is_available = ?, image_path = ?
-      WHERE id = ?
-    `;
-    const params = [item_name, description, price, category, isSpecialInt, isAvailableInt, finalImagePath, id];
-
-    await db.promise().query(sql, params);
-    res.json({ success: true, message: 'Menu item updated successfully' });
-  } catch (err) {
-    console.error('Update Error:', err);
-    res.status(500).json({ success: false, message: 'Failed to update menu item' });
+    await db.promise().query(sql, values);
+    res.json({ success: true, message: 'Item updated' });
+  } catch (error) {
+    console.error('Update Error:', error);
+    res.status(500).json({ success: false, message: 'Error updating item' });
   }
 });
 

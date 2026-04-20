@@ -43,14 +43,10 @@
     <main>
       <div class="container">
         <section class="filter-section reveal">
-          <div class="filter-buttons" style="flex-wrap: wrap; justify-content: center;">
+          <div id="categoryFilters" class="filter-buttons" style="flex-wrap: wrap; justify-content: center;">
             <button class="filter-btn active" data-filter="All">All Dishes</button>
-            <button class="filter-btn" data-filter="Veg">Pure Veg</button>
-            <button class="filter-btn" data-filter="Non-Veg">Non-Veg</button>
-            <button class="filter-btn" data-filter="Fresh Juice">Fresh Juice</button>
-            <button class="filter-btn" data-filter="Soda">Soda</button>
-            <button class="filter-btn" data-filter="Ice Cream">Ice Cream</button>
-            <button class="filter-btn" data-filter="Desserts">Desserts</button>
+            <!-- Categories will be injected here -->
+            <span style="color: var(--text-muted); font-size: 0.8rem; padding: 10px;">Loading categories...</span>
           </div>
         </section>
 
@@ -60,8 +56,8 @@
         </section>
 
         <section>
-          <h2 class="section-title reveal">Full Menu</h2>
-          <div id="menuContainer" class="menu-grid"></div>
+          <h2 id="fullMenuTitle" class="section-title reveal">Full Menu</h2>
+          <div id="menuContainer"></div>
         </section>
       </div>
     </main>
