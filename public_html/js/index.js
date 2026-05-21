@@ -1,4 +1,4 @@
-const SERVER_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? 'http://localhost:5000' : window.location.origin;
+const SERVER_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.protocol === 'file:' || !window.location.hostname ? 'http://localhost:5000' : window.location.origin;
 const API_BASE = `${SERVER_URL}/api`;
 let allMenuItems = [];
 let currentFilter = 'All';
@@ -89,8 +89,7 @@ async function fetchMenu() {
         '<div class="empty-text">Failed to load menu.</div>';
     }
   } catch (error) {
-    document.getElementById('menuContainer').innerHTML =
-      '<div class="empty-text">Server connection error.</div>';
+    console.error('Server connection error:', error);
   }
 }
 
