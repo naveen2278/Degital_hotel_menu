@@ -20,9 +20,19 @@ app.use('/image_assets', express.static(path.join(__dirname, '../image_and_icon'
 
 const fs = require('fs');
 
-// Serve frontend static files
-app.use(express.static(path.join(__dirname, '../public_html')));
-app.use(express.static(path.join(__dirname, '..')));
+// Serve frontend static files without browser caching
+const cacheDisableOptions = {
+  etag: false,
+  maxAge: 0,
+  setHeaders: (res, filepath) => {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+  }
+};
+
+app.use(express.static(path.join(__dirname, '../public_html'), cacheDisableOptions));
+app.use(express.static(path.join(__dirname, '..'), cacheDisableOptions));
 
 // Root route serves index.html from public_html
 app.get('/', (req, res) => {
