@@ -5,50 +5,42 @@ let currentFilter = 'All';
 let parcelStatus = 'open';
 
 async function checkShopStatus() {
-  try {
-    const response = await fetch(`${API_BASE}/settings/shop-status`);
-    const result = await response.json();
-    if (result.success) {
-      const closedScreen = document.getElementById('closed-screen');
-      const entrySelection = document.getElementById('entry-selection');
-      const siteWrapper = document.querySelector('.site-wrapper');
-      
-      const hoursDisplay = document.getElementById('store-hours-display');
-      if (hoursDisplay) {
-        if (result.closedAt) {
-          hoursDisplay.textContent = `Closed at ${result.closedAt} to Morning 10:00 AM`;
-        } else {
-          hoursDisplay.textContent = `Closed to Morning 10:00 AM`;
-        }
-      }
-      
-      if (result.status === 'closed') {
-        if (closedScreen) closedScreen.style.display = 'flex';
-        if (entrySelection) entrySelection.style.display = 'none';
-        if (siteWrapper) siteWrapper.style.display = 'none';
-        return false; // closed
+  const response = await fetch(`${API_BASE}/settings/shop-status`);
+  const result = await response.json();
+  if (result.success) {
+    const closedScreen = document.getElementById('closed-screen');
+    const entrySelection = document.getElementById('entry-selection');
+    const siteWrapper = document.querySelector('.site-wrapper');
+    
+    const hoursDisplay = document.getElementById('store-hours-display');
+    if (hoursDisplay) {
+      if (result.closedAt) {
+        hoursDisplay.textContent = `Closed at ${result.closedAt} to Morning 10:00 AM`;
       } else {
-        if (closedScreen) closedScreen.style.display = 'none';
-        return true; // open
+        hoursDisplay.textContent = `Closed to Morning 10:00 AM`;
       }
     }
-  } catch (error) {
-    console.error('Error checking shop status:', error);
+    
+    if (result.status === 'closed') {
+      if (closedScreen) closedScreen.style.display = 'flex';
+      if (entrySelection) entrySelection.style.display = 'none';
+      if (siteWrapper) siteWrapper.style.display = 'none';
+      return false; // closed
+    } else {
+      if (closedScreen) closedScreen.style.display = 'none';
+      return true; // open
+    }
   }
   return true; // default to open on error
 }
 
 async function loadParcelStatus() {
-  try {
-    const response = await fetch(`${API_BASE}/settings/parcel-status`);
-    const result = await response.json();
-    if (result.success) {
-      parcelStatus = result.status;
-      updateParcelEntryUI();
-      return result.status === 'open';
-    }
-  } catch (error) {
-    console.error('Error loading parcel status:', error);
+  const response = await fetch(`${API_BASE}/settings/parcel-status`);
+  const result = await response.json();
+  if (result.success) {
+    parcelStatus = result.status;
+    updateParcelEntryUI();
+    return result.status === 'open';
   }
   return true;
 }
@@ -76,50 +68,42 @@ async function fetchMenu() {
   if (!isOpen) return;
 
   await fetchCategories();
-  try {
-    const response = await fetch(`${API_BASE}/menu`);
-    const result = await response.json();
+  const response = await fetch(`${API_BASE}/menu`);
+  const result = await response.json();
 
-    if (result.success) {
-      allMenuItems = result.data;
-      renderSpecialItems();
-      renderMenuItems();
-    } else {
-      document.getElementById('menuContainer').innerHTML =
-        '<div class="empty-text">Failed to load menu.</div>';
-    }
-  } catch (error) {
-    console.error('Server connection error:', error);
+  if (result.success) {
+    allMenuItems = result.data;
+    renderSpecialItems();
+    renderMenuItems();
+  } else {
+    document.getElementById('menuContainer').innerHTML =
+      '<div class="empty-text">Failed to load menu.</div>';
   }
 }
 
 async function fetchCategories() {
-  try {
-    const response = await fetch(`${API_BASE}/categories`);
-    const result = await response.json();
-    if (result.success) {
-      const container = document.getElementById('categoryFilters');
-      if (container) {
-        container.innerHTML = `<button class="filter-btn ${currentFilter === 'All' ? 'active' : ''}" data-filter="All">All Dishes</button>` + 
-          `<button class="filter-btn ${currentFilter === 'Combos' ? 'active' : ''}" data-filter="Combos">Combos</button>` +
-          result.data.map(cat => `
-            <button class="filter-btn ${currentFilter === cat.name ? 'active' : ''}" data-filter="${cat.name}">${cat.name}</button>
-          `).join('');
-        
-        // Re-attach listeners
-        document.querySelectorAll('.filter-btn').forEach(btn => {
-          btn.addEventListener('click', () => {
-            document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            currentFilter = btn.getAttribute('data-filter');
-            currentSubFilter = null; // Reset sub-filter when category changes
-            renderMenuItems();
-          });
+  const response = await fetch(`${API_BASE}/categories`);
+  const result = await response.json();
+  if (result.success) {
+    const container = document.getElementById('categoryFilters');
+    if (container) {
+      container.innerHTML = `<button class="filter-btn ${currentFilter === 'All' ? 'active' : ''}" data-filter="All">All Dishes</button>` + 
+        `<button class="filter-btn ${currentFilter === 'Combos' ? 'active' : ''}" data-filter="Combos">Combos</button>` +
+        result.data.map(cat => `
+          <button class="filter-btn ${currentFilter === cat.name ? 'active' : ''}" data-filter="${cat.name}">${cat.name}</button>
+        `).join('');
+      
+      // Re-attach listeners
+      document.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          currentFilter = btn.getAttribute('data-filter');
+          currentSubFilter = null; // Reset sub-filter when category changes
+          renderMenuItems();
         });
-      }
+      });
     }
-  } catch (error) {
-    console.error('Error loading categories:', error);
   }
 }
 
@@ -619,43 +603,37 @@ document.getElementById('placeOrderBtn').addEventListener('click', async () => {
     }))
   };
 
-  try {
-    const btn = document.getElementById('placeOrderBtn');
-    btn.disabled = true;
-    btn.textContent = 'Processing...';
+  const btn = document.getElementById('placeOrderBtn');
+  btn.disabled = true;
+  btn.textContent = 'Processing...';
 
-    const response = await fetch(`${API_BASE}/orders`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(orderData)
-    });
+  const response = await fetch(`${API_BASE}/orders`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(orderData)
+  });
 
-    const result = await response.json();
+  const result = await response.json();
 
-    if (result.success) {
-      statusEl.textContent = 'Order placed successfully! Please wait.';
-      statusEl.style.color = 'var(--success)';
-      cart = [];
-      saveCartToStorage();
-      updateCartUI();
-      setTimeout(() => {
-        toggleCartModal();
-        statusEl.textContent = '';
-        document.getElementById('tableNumber').value = '';
-        document.getElementById('customerPhone').value = '';
-      }, 3000);
-    } else {
-      statusEl.textContent = result.message || 'Failed to place order.';
-      statusEl.style.color = 'var(--danger)';
-    }
-  } catch (error) {
-    statusEl.textContent = 'Server error. Please try again.';
+  if (result.success) {
+    statusEl.textContent = 'Order placed successfully! Please wait.';
+    statusEl.style.color = 'var(--success)';
+    cart = [];
+    saveCartToStorage();
+    updateCartUI();
+    setTimeout(() => {
+      toggleCartModal();
+      statusEl.textContent = '';
+      document.getElementById('tableNumber').value = '';
+      document.getElementById('customerPhone').value = '';
+    }, 3000);
+  } else {
+    statusEl.textContent = result.message || 'Failed to place order.';
     statusEl.style.color = 'var(--danger)';
-  } finally {
-    const btn = document.getElementById('placeOrderBtn');
-    btn.disabled = false;
-    btn.textContent = 'Confirm Order';
   }
+  
+  btn.disabled = false;
+  btn.textContent = 'Confirm Order';
 });
 
 function setActiveFilterButton(selectedButton) {
