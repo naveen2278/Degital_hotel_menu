@@ -18,12 +18,24 @@ app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use('/image_assets', express.static(path.join(__dirname, '../image_and_icon')));
 
+const fs = require('fs');
+
 // Serve frontend static files
 app.use(express.static(path.join(__dirname, '../public_html')));
+app.use(express.static(path.join(__dirname, '..')));
 
 // Root route serves index.html from public_html
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, '../public_html/index.html'));
+  const primaryPath = path.join(__dirname, '../public_html/index.html');
+  const fallbackPath = path.join(__dirname, '../index.html');
+  
+  if (fs.existsSync(primaryPath)) {
+    res.sendFile(primaryPath);
+  } else if (fs.existsSync(fallbackPath)) {
+    res.sendFile(fallbackPath);
+  } else {
+    res.status(404).send('index.html not found');
+  }
 });
 
 
@@ -342,6 +354,32 @@ app.post('/api/generate-description', async (req, res) => {
   }
 });
 
+async function ensureDatabaseExists() {
+  const mysql = require('mysql2/promise');
+  const dbName = process.env.DB_NAME ?? 'u943133069_hotel_menu';
+  
+  let dbHost = process.env.DB_HOST ?? '127.0.0.1';
+  let dbPort = parseInt(process.env.DB_PORT) || 3306;
+
+  if (dbHost.includes(':')) {
+    const parts = dbHost.split(':');
+    dbHost = parts[0];
+    dbPort = parseInt(parts[1]) || dbPort;
+  }
+
+  // Connect to MySQL server without selecting a database
+  const connection = await mysql.createConnection({
+    host: dbHost,
+    user: process.env.DB_USER ?? 'u943133069_nighteat',
+    password: process.env.DB_PASSWORD ?? 'Nighteat@2278',
+    port: dbPort
+  });
+
+  await connection.query(`CREATE DATABASE IF NOT EXISTS \`${dbName}\``);
+  await connection.end();
+  console.log(`Database verified/created: "${dbName}"`);
+}
+
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'Server is running' });
@@ -349,6 +387,14 @@ app.get('/api/health', (req, res) => {
 
 async function startServer() {
   try {
+    // Automatically ensure the database exists
+    try {
+      await ensureDatabaseExists();
+    } catch (dbCreateError) {
+      console.warn('Database pre-creation check skipped/failed:', dbCreateError.message);
+      // Proceed to try pool connection anyway in case of restricted user privileges
+    }
+
     await db.promise().getConnection().then(conn => conn.release());
     await checkDatabaseSchema();
 
