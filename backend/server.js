@@ -19,9 +19,14 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use('/image_assets', express.static(path.join(__dirname, '../image_and_icon')));
 
 // Serve frontend static files
-app.use(express.static(path.join(__dirname, '../frontend')));
+app.use(express.static(path.join(__dirname, '../public_html')));
 
-// Routes
+// Root route serves index.html from public_html
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, '../public_html/index.html'));
+});
+
+
 app.use('/api/auth', authRoutes);
 app.use('/api/menu', menuRoutes);
 app.use('/api/orders', orderRoutes);
@@ -57,6 +62,74 @@ app.delete('/api/categories/:id', async (req, res) => {
   }
 });
 
+// --- SHOP STATUS ROUTES ---
+app.get('/api/settings/shop-status', async (req, res) => {
+  try {
+    const [rows] = await db.promise().query("SELECT key_name, key_value FROM settings WHERE key_name IN ('shop_status', 'closed_at')");
+    const statusRow = rows.find(r => r.key_name === 'shop_status');
+    const closedAtRow = rows.find(r => r.key_name === 'closed_at');
+    
+    const status = statusRow ? statusRow.key_value : 'open';
+    const closedAt = closedAtRow ? closedAtRow.key_value : null;
+    
+    res.json({ success: true, status, closedAt });
+  } catch (error) {
+    console.error('FETCH SHOP STATUS ERROR:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch shop status' });
+  }
+});
+
+const authMiddleware = require('./middleware/authMiddleware');
+app.post('/api/settings/shop-status', authMiddleware, async (req, res) => {
+  const { status, closedAt } = req.body;
+  if (!status || !['open', 'closed'].includes(status)) {
+    return res.status(400).json({ success: false, message: 'Valid status (open/closed) is required' });
+  }
+  try {
+    await db.promise().query("INSERT INTO settings (key_name, key_value) VALUES ('shop_status', ?) ON DUPLICATE KEY UPDATE key_value = ?", [status, status]);
+    
+    if (status === 'closed' && closedAt) {
+      await db.promise().query("INSERT INTO settings (key_name, key_value) VALUES ('closed_at', ?) ON DUPLICATE KEY UPDATE key_value = ?", [closedAt, closedAt]);
+    }
+    
+    res.json({ success: true, message: 'Shop status updated successfully!', status, closedAt });
+  } catch (error) {
+    console.error('UPDATE SHOP STATUS ERROR:', error);
+    res.status(500).json({ success: false, message: 'Failed to update shop status' });
+  }
+});
+
+// --- PARCEL STATUS ROUTES ---
+app.get('/api/settings/parcel-status', async (req, res) => {
+  try {
+    const [rows] = await db.promise().query("SELECT key_value FROM settings WHERE key_name = 'parcel_status' LIMIT 1");
+    const status = rows.length > 0 ? rows[0].key_value : 'open';
+    res.json({ success: true, status });
+  } catch (error) {
+    console.error('FETCH PARCEL STATUS ERROR:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch parcel status' });
+  }
+});
+
+app.post('/api/settings/parcel-status', authMiddleware, async (req, res) => {
+  const { status } = req.body;
+  if (!status || !['open', 'closed'].includes(status)) {
+    return res.status(400).json({ success: false, message: 'Valid status (open/closed) is required' });
+  }
+
+  try {
+    await db.promise().query(
+      "INSERT INTO settings (key_name, key_value) VALUES ('parcel_status', ?) ON DUPLICATE KEY UPDATE key_value = ?",
+      [status, status]
+    );
+
+    res.json({ success: true, message: 'Parcel status updated successfully!', status });
+  } catch (error) {
+    console.error('UPDATE PARCEL STATUS ERROR:', error);
+    res.status(500).json({ success: false, message: 'Failed to update parcel status' });
+  }
+});
+
 // Automatic Schema Check and Table Creation
 async function checkDatabaseSchema() {
   try {
@@ -79,6 +152,34 @@ async function checkDatabaseSchema() {
       )
     `);
 
+    // Create settings table
+    await db.promise().query(`
+      CREATE TABLE IF NOT EXISTS settings (
+        key_name VARCHAR(100) PRIMARY KEY,
+        key_value VARCHAR(255) NOT NULL
+      )
+    `);
+
+    // Seed default shop status if empty
+    const [existingSettings] = await db.promise().query("SELECT COUNT(*) as count FROM settings WHERE key_name = 'shop_status'");
+    if (existingSettings[0].count === 0) {
+      await db.promise().query("INSERT INTO settings (key_name, key_value) VALUES ('shop_status', 'open')");
+      console.log('Seeded default shop status: open');
+    }
+
+    const [existingParcelStatus] = await db.promise().query("SELECT COUNT(*) as count FROM settings WHERE key_name = 'parcel_status'");
+    if (existingParcelStatus[0].count === 0) {
+      await db.promise().query("INSERT INTO settings (key_name, key_value) VALUES ('parcel_status', 'open')");
+      console.log('Seeded default parcel status: open');
+    }
+
+    // Seed default store hours if empty
+    const [existingHours] = await db.promise().query("SELECT COUNT(*) as count FROM settings WHERE key_name = 'store_hours'");
+    if (existingHours[0].count === 0) {
+      await db.promise().query("INSERT INTO settings (key_name, key_value) VALUES ('store_hours', '6:00 PM - 3:00 AM')");
+      console.log('Seeded default store hours: 6:00 PM - 3:00 AM');
+    }
+
     // Create menu_items table (VARCHAR category)
     await db.promise().query(`
       CREATE TABLE IF NOT EXISTS menu_items (
@@ -90,7 +191,7 @@ async function checkDatabaseSchema() {
         price_half DECIMAL(10,2) DEFAULT NULL,
         price_full DECIMAL(10,2) DEFAULT NULL,
         category VARCHAR(100) NOT NULL,
-        food_type ENUM('Veg', 'Non-Veg') NOT NULL DEFAULT 'Veg',
+        food_type ENUM('Veg', 'Non-Veg', 'Combo') NOT NULL DEFAULT 'Veg',
         is_special TINYINT(1) DEFAULT 0,
         is_available TINYINT(1) DEFAULT 1,
         image_path VARCHAR(255) DEFAULT NULL,
@@ -104,8 +205,15 @@ async function checkDatabaseSchema() {
     const columnNames = menuColumns.map(c => c.Field);
 
     if (!columnNames.includes('food_type')) {
-      await db.promise().query("ALTER TABLE menu_items ADD COLUMN food_type ENUM('Veg', 'Non-Veg') NOT NULL DEFAULT 'Veg' AFTER category");
+      await db.promise().query("ALTER TABLE menu_items ADD COLUMN food_type ENUM('Veg', 'Non-Veg', 'Combo') NOT NULL DEFAULT 'Veg' AFTER category");
       console.log('Added food_type to menu_items');
+    }
+
+    // Migrate food_type ENUM to include Combo if it exists but lacks it
+    const foodTypeCol = menuColumns.find(c => c.Field === 'food_type');
+    if (foodTypeCol && !foodTypeCol.Type.includes("'Combo'")) {
+      await db.promise().query("ALTER TABLE menu_items MODIFY COLUMN food_type ENUM('Veg', 'Non-Veg', 'Combo') NOT NULL DEFAULT 'Veg'");
+      console.log('Migrated food_type to include Combo');
     }
 
     // Migrate ENUM to VARCHAR if needed
@@ -140,14 +248,39 @@ async function checkDatabaseSchema() {
     await db.promise().query(`
       CREATE TABLE IF NOT EXISTS orders (
         id INT PRIMARY KEY AUTO_INCREMENT,
+        daily_order_number INT DEFAULT NULL,
         table_number VARCHAR(20) NOT NULL,
         total_amount DECIMAL(10,2) NOT NULL,
-        status ENUM('Pending', 'Processing', 'Delivered', 'Completed', 'Cancelled') DEFAULT 'Pending',
+        status ENUM('Pending', 'Accepted', 'Processing', 'Delivered', 'Completed', 'Cancelled') DEFAULT 'Pending',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         customer_name VARCHAR(100) DEFAULT NULL,
         order_type ENUM('Dine-in', 'Parcel') DEFAULT 'Dine-in'
       )
     `);
+
+    // Migrate status ENUM to include Accepted and add daily_order_number
+    try {
+      await db.promise().query("ALTER TABLE orders MODIFY COLUMN status ENUM('Pending', 'Accepted', 'Processing', 'Delivered', 'Completed', 'Cancelled') DEFAULT 'Pending'");
+      await db.promise().query("ALTER TABLE orders ADD COLUMN IF NOT EXISTS daily_order_number INT DEFAULT NULL AFTER id");
+      await db.promise().query("UPDATE orders SET status = 'Accepted' WHERE status = ''");
+      
+      // Auto-fix historical orders to guarantee strict daily sequence (1, 2, 3...)
+      const [allOrders] = await db.promise().query("SELECT id, created_at FROM orders ORDER BY created_at ASC");
+      let currentDateStr = '';
+      let currentCounter = 1;
+      for (const ord of allOrders) {
+          const dateObj = new Date(ord.created_at);
+          const dateStr = dateObj.getFullYear() + '-' + dateObj.getMonth() + '-' + dateObj.getDate();
+          if (dateStr !== currentDateStr) {
+              currentDateStr = dateStr;
+              currentCounter = 1;
+          }
+          await db.promise().query("UPDATE orders SET daily_order_number = ? WHERE id = ?", [currentCounter, ord.id]);
+          currentCounter++;
+      }
+    } catch (err) {
+      console.log('Migration note: order status enum migration failed or already applied:', err.message);
+    }
 
     // Create order_items table
     await db.promise().query(`
@@ -175,25 +308,70 @@ async function checkDatabaseSchema() {
   }
 }
 
+// --- AI DESCRIPTION ROUTE ---
+app.post('/api/generate-description', async (req, res) => {
+  const { itemName, category } = req.body;
+  if (!itemName) return res.status(400).json({ success: false, message: 'Item name is required' });
+
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    return res.status(500).json({ success: false, message: 'OpenAI API key not configured. Please add OPENAI_API_KEY to your backend/.env file.' });
+  }
+
+  try {
+    const { OpenAI } = require('openai');
+    const openai = new OpenAI({ 
+      apiKey,
+      baseURL: "https://openrouter.ai/api/v1",
+    });
+    
+    const prompt = `Write a short, appetizing, 1 to 2 sentence menu description for a premium restaurant dish named '${itemName}' in the '${category || 'Other'}' category. Focus on taste, texture, and premium quality. Do not include the name of the dish in the description itself. Just the description.`;
+    
+    const response = await openai.chat.completions.create({
+      model: "google/gemini-2.5-flash",
+      messages: [{ role: "user", content: prompt }],
+      max_tokens: 100,
+    });
+    
+    const text = response.choices[0].message.content.trim();
+    
+    res.json({ success: true, description: text });
+  } catch (error) {
+    console.error('AI GENERATION ERROR:', error);
+    res.status(500).json({ success: false, message: 'Failed to generate description via AI. ' + error.message });
+  }
+});
+
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'Server is running' });
 });
 
-// Start server
-app.listen(PORT, async () => {
-  console.log(`Hotel Menu System Backend running on http://localhost:${PORT}`);
-  await checkDatabaseSchema();
+async function startServer() {
+  try {
+    await db.promise().getConnection().then(conn => conn.release());
+    await checkDatabaseSchema();
 
-  // Auto-seed logic
-  const [existingItems] = await db.promise().query('SELECT COUNT(*) as count FROM menu_items');
-  if (existingItems[0].count === 0) {
-    console.log('Menu is empty. Auto-seeding...');
-    try {
-      const { exec } = require('child_process');
-      exec('node backend/seed_menu.js');
-    } catch (e) {}
+    app.listen(PORT, () => {
+      console.log(`Hotel Menu System Backend running on http://localhost:${PORT}`);
+    });
+
+    const [existingItems] = await db.promise().query('SELECT COUNT(*) as count FROM menu_items');
+    if (existingItems[0].count === 0) {
+      console.log('Menu is empty. Auto-seeding...');
+      try {
+        const { exec } = require('child_process');
+        exec('node backend/seed_menu.js');
+      } catch (e) {
+        console.error('Auto-seed execution error:', e);
+      }
+    }
+  } catch (error) {
+    console.error('Failed to start server due to database error:', error);
+    process.exit(1);
   }
-});
+}
+
+startServer();
 
 module.exports = app;

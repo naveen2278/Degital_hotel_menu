@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NightEat - Dashboard</title>
+  <link rel="icon" type="image/png" href="favicon.png" />
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/admin-extra.css" />
+  <style>
+    /* ── Starfield ── */
+    #starfield { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+    .star {
+      position: absolute; border-radius: 50%; background: white;
+      animation: twinkle var(--d) infinite ease-in-out; opacity: 0;
+    }
+    @keyframes twinkle {
+      0%, 100% { opacity: 0; transform: scale(0.5); }
+      50% { opacity: var(--o); transform: scale(1); }
+    }
+    /* ── Orbs ── */
+    .db-orb {
+      position: fixed; border-radius: 50%; filter: blur(90px); z-index: 0; pointer-events: none;
+      animation: orbDrift 22s infinite alternate ease-in-out;
+    }
+    .db-orb-1 { width: 550px; height: 550px; background: radial-gradient(circle, rgba(212,93,38,0.14) 0%, transparent 70%); top: -180px; left: -180px; animation-delay: 0s; }
+    .db-orb-2 { width: 420px; height: 420px; background: radial-gradient(circle, rgba(168,85,247,0.09) 0%, transparent 70%); bottom: -120px; right: -120px; animation-delay: -8s; }
+    .db-orb-3 { width: 320px; height: 320px; background: radial-gradient(circle, rgba(59,130,246,0.06) 0%, transparent 70%); top: 35%; left: 50%; animation-delay: -16s; }
+    @keyframes orbDrift {
+      0%   { transform: translate(0,0) scale(1); }
+      33%  { transform: translate(80px, 50px) scale(1.1); }
+      66%  { transform: translate(-40px, 100px) scale(0.9); }
+      100% { transform: translate(0,0) scale(1); }
+    }
+    /* ── Grid ── */
+    .db-grid {
+      position: fixed; inset: 0; z-index: 0; pointer-events: none;
+      background-image:
+        linear-gradient(rgba(212,93,38,0.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(212,93,38,0.025) 1px, transparent 1px);
+      background-size: 65px 65px;
+    }
+    /* Ensure dashboard content sits above background layers */
+    .dashboard-container { position: relative; z-index: 1; }
+    .modal { z-index: 2000 !important; }
+    #categoryModal { z-index: 9999 !important; }
+  </style>
+</head>
+<body style="background: #05050f; overflow-x: hidden;">
+  <!-- Animated Starfield -->
+  <div id="starfield"></div>
+
+  <!-- Glowing Orbs -->
+  <div class="db-orb db-orb-1"></div>
+  <div class="db-orb db-orb-2"></div>
+  <div class="db-orb db-orb-3"></div>
+
+  <!-- Grid Lines -->
+  <div class="db-grid"></div>
+
+  <script>
+    // Generate starfield
+    (function() {
+      const sf = document.getElementById('starfield');
+      for (let i = 0; i < 140; i++) {
+        const s = document.createElement('div');
+        s.className = 'star';
+        const sz = (Math.random() * 2.5 + 0.5).toFixed(1);
+        s.style.cssText = [
+          `width:${sz}px`, `height:${sz}px`,
+          `top:${Math.random()*100}%`, `left:${Math.random()*100}%`,
+          `--d:${(Math.random()*4+2).toFixed(1)}s`,
+          `--o:${(Math.random()*0.45+0.15).toFixed(2)}`,
+          `animation-delay:${(Math.random()*6).toFixed(1)}s`
+        ].join(';');
+        sf.appendChild(s);
+      }
+    })();
+  </script>
+
+  <div class="dashboard-container">
+    <header class="dashboard-header reveal" style="background: var(--glass-bg); backdrop-filter: blur(20px); border: 1px solid var(--glass-border); sticky: top 20px; z-index: 1000; margin-bottom: 40px; box-shadow: 0 10px 40px rgba(0,0,0,0.4);">
+      <!-- Brand Logo & Title -->
+      <div class="header-brand" style="display: flex; align-items: center; gap: 15px;">
+        <img src="pagene.png" alt="NightEat Logo" style="width: 50px; height: auto; filter: drop-shadow(0 0 15px rgba(212, 93, 38, 0.4));" />
+        <h1 style="font-family: 'Outfit'; color: var(--text-main); margin: 0; font-size: 1.8rem; letter-spacing: -0.5px;">Dashboard</h1>
+      </div>
+      
+      <!-- Navigation tabs -->
+      <div class="header-nav-tabs" style="display: flex; gap: 15px;">
+        <button id="showMenuBtn" class="filter-btn active" onclick="switchSection('menu')" style="display: flex; align-items: center; gap: 8px;">
+          <span>🍽️</span> Menu
+        </button>
+        <button id="showComboBtn" class="filter-btn" onclick="switchSection('combo')" style="display: flex; align-items: center; gap: 8px;">
+          <span>🍱</span> Combos
+        </button>
+        <button id="showOrdersBtn" class="filter-btn" onclick="switchSection('orders')" style="display: flex; align-items: center; gap: 8px;">
+          <span>📋</span> Orders
+        </button>
+        <button id="takeParcelBtnHeader" class="filter-btn parcel-btn-header" onclick="openTakeOrderModal()" style="display: flex; align-items: center; gap: 8px;">
+          <span>🛍️</span> Take Order
+        </button>
+      </div>
+
+      <!-- System Controls (Shop Status, Theme, Logout) -->
+      <div class="header-controls" style="display: flex; align-items: center; gap: 12px;">
+        <!-- Shop Status Dropdown -->
+        <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
+          <span style="font-family: 'Inter', sans-serif; font-size: 0.72rem; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--text-muted);">Shop:</span>
+          <select id="shopStatusSelect" onchange="updateShopStatus(this.value)" style="
+            height: 44px; padding: 0 16px;
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            border-radius: 12px;
+            color: #10b981;
+            font-family: 'Inter', sans-serif;
+            font-weight: 700;
+            font-size: 0.85rem;
+            outline: none;
+            cursor: pointer;
+            transition: all 0.3s ease;
+          ">
+            <option value="open" style="background: #0b0c16; color: #10b981;">🟢 Open</option>
+            <option value="closed" style="background: #0b0c16; color: #ef4444;">🔴 Closed</option>
+          </select>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
+          <span style="font-family: 'Inter', sans-serif; font-size: 0.72rem; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--text-muted);">Parcel:</span>
+          <select id="parcelStatusSelect" onchange="updateParcelStatus(this.value)" style="
+            height: 44px; padding: 0 16px;
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            border-radius: 12px;
+            color: #10b981;
+            font-family: 'Inter', sans-serif;
+            font-weight: 700;
+            font-size: 0.85rem;
+            outline: none;
+            cursor: pointer;
+            transition: all 0.3s ease;
+          ">
+            <option value="open" style="background: #0b0c16; color: #10b981;">🟢 Open</option>
+            <option value="closed" style="background: #0b0c16; color: #ef4444;">🔴 Closed</option>
+          </select>
+        </div>
+
+        <!-- Theme Toggle -->
+        <button type="button" id="themeToggleBtn" onclick="toggleTheme()" title="Toggle theme" style="
+          width: 44px; height: 44px; border-radius: 12px;
+          background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.1);
+          cursor: pointer; font-size: 1.2rem; display: flex; align-items: center;
+          justify-content: center; transition: all 0.3s ease; flex-shrink: 0;
+        ">🌙</button>
+        <button type="button" id="logoutBtn" class="logout-btn">Logout</button>
+      </div>
+    </header>
+
+    <!-- Menu Management Section -->
+    <div id="menuSection" class="dashboard-grid">
+      <!-- Left Column: Add New Item -->
+      <aside class="dashboard-card reveal">
+        <h2 style="font-weight: 700; font-size: 1.7rem; margin-bottom: 25px; color: var(--text-main); letter-spacing: -0.5px;">Add New Dish</h2>
+        <form id="addItemForm" enctype="multipart/form-data">
+          <div class="form-group">
+            <label>Item Name</label>
+            <input type="text" id="itemName" placeholder="e.g. Paneer Tikka" required />
+          </div>
+          <div class="form-group">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+              <label style="margin-bottom: 0;">Description</label>
+              <button type="button" id="aiBtnAdd" onclick="generateDescriptionWithAI('itemName', 'category', 'description', 'aiBtnAdd')" style="background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); color: #fcd34d; font-size: 0.75rem; padding: 4px 10px; border-radius: 6px; cursor: pointer; transition: 0.3s; display: flex; align-items: center; gap: 5px;">
+                ✨ Generate with AI
+              </button>
+            </div>
+            <textarea id="description" rows="3" placeholder="Describe the flavors..."></textarea>
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 25px;">
+            <div class="form-group" style="margin-bottom:0;">
+              <label>Category</label>
+              <div style="display: flex; gap: 10px; align-items: center;">
+                <select id="category" required style="flex-grow: 1; min-width: 140px; height: 48px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; color: var(--text-main); padding: 0 12px; outline: none;">
+                  <option value="" selected>Select Category</option>
+                </select>
+                <div style="display: flex; gap: 6px;">
+                  <button type="button" onclick="toggleAddCategory()" title="Add New Category" style="width: 48px; height: 48px; border-radius: 12px; background: var(--primary); border: none; color: var(--text-main); cursor: pointer; font-size: 1.2rem; display: flex; align-items: center; justify-content: center; transition: 0.3s; box-shadow: 0 4px 12px rgba(212, 93, 38, 0.2);">+</button>
+                  <button type="button" onclick="openManageCategoriesModal()" title="Manage Existing" style="width: 48px; height: 48px; border-radius: 12px; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); color: var(--text-muted); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.3s;">⚙️</button>
+                </div>
+              </div>
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+              <label>Food Type</label>
+              <select id="foodType" required style="height: 48px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; color: var(--text-main); padding: 0 12px; outline: none; transition: 0.3s;" onfocus="this.style.borderColor='var(--primary)'" onblur="this.style.borderColor='rgba(255,255,255,0.1)'">
+                <option value="" selected>Select Type</option>
+                <option value="Veg">Pure Veg</option>
+                <option value="Non-Veg">Non-Veg</option>
+                <option value="Combo">Combo</option>
+              </select>
+            </div>
+          </div>
+          
+          <!-- Inline Add Category Input (Hidden by default) -->
+          <div id="newCategoryContainer" style="display: none; margin: -10px 0 25px 0; padding: 18px; background: rgba(15, 23, 42, 0.6); border-radius: 16px; border: 1px solid rgba(212, 93, 38, 0.2); gap: 12px; animation: cosmicReveal 0.4s var(--ease-out-back); box-shadow: 0 10px 30px rgba(0,0,0,0.3); flex-direction: row; align-items: center;">
+            <input type="text" id="newCategoryName" placeholder="Enter new category name..." style="flex-grow: 1; height: 45px; font-size: 0.95rem; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1); color: var(--text-main); padding: 0 15px; border-radius: 10px; outline: none; transition: 0.3s;" onfocus="this.style.borderColor='var(--primary)'" onblur="this.style.borderColor='rgba(255,255,255,0.1)'" />
+            <button type="button" onclick="saveNewCategory()" class="primary-btn" style="width: auto; padding: 0 25px; height: 45px; font-size: 0.9rem; margin-top: 0; box-shadow: var(--shadow-premium);">
+              Add Category
+            </button>
+          </div>
+          <div class="form-group">
+            <label>Price (Default/Single)</label>
+            <input type="number" step="0.01" id="price" placeholder="Enter default price" required>
+          </div>
+          <!-- Multi-Pricing for Grill/Tandoori -->
+          <div id="tieredPriceContainer" style="display: none; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 20px;">
+            <div class="form-group" style="margin-bottom:0;">
+              <label style="font-size: 0.75rem;">Price (Quarter)</label>
+              <input type="number" step="0.01" id="price_quarter" placeholder="Quarter">
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+              <label style="font-size: 0.75rem;">Price (Half)</label>
+              <input type="number" step="0.01" id="price_half" placeholder="Half">
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+              <label style="font-size: 0.75rem;">Price (Full)</label>
+              <input type="number" step="0.01" id="price_full" placeholder="Full">
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Upload Image</label>
+            <input type="file" id="itemImage" accept="image/*" />
+          </div>
+          <div style="display: flex; gap: 20px; margin-bottom: 25px;">
+            <label style="display: flex; align-items: center; gap: 8px; font-size: 0.9rem; font-weight: 600; cursor: pointer;">
+              <input type="checkbox" id="isSpecial" style="width: 18px; height: 18px; accent-color: var(--primary);" /> Special
+            </label>
+            <label style="display: flex; align-items: center; gap: 8px; font-size: 0.9rem; font-weight: 600; cursor: pointer;">
+              <input type="checkbox" id="isAvailable" checked style="width: 18px; height: 18px; accent-color: var(--primary);" /> Available
+            </label>
+          </div>
+          <button type="submit" class="primary-btn">Create Item</button>
+        </form>
+        <p id="statusMessage" class="message-text"></p>
+      </aside>
+
+      <!-- Right Column: Menu Items List -->
+      <section class="dashboard-card reveal" style="animation-delay: 0.1s;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; flex-wrap: wrap; gap: 15px;">
+          <h2 style="margin: 0; border: none; padding: 0;">Manage Menu Items</h2>
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <label style="font-size: 0.8rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Filter By:</label>
+            <select id="adminCategoryFilter" onchange="filterAdminMenu()" style="padding: 8px 12px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: var(--text-main); font-size: 0.85rem; outline: none; cursor: pointer; min-width: 150px;">
+              <option value="All" selected>Loading...</option>
+            </select>
+          </div>
+        </div>
+
+        <div id="adminMenuList" class="admin-menu-list">
+          <!-- Items will be injected here as modern list cards -->
+          <p style="text-align: center; color: var(--text-muted); padding: 40px;">Loading your menu...</p>
+        </div>
+      </section>
+    </div>
+
+    <!-- Combo Management Section -->
+    <div id="comboSection" class="dashboard-grid" style="display: none;">
+      <!-- Left Column: Add New Combo -->
+      <aside class="dashboard-card reveal">
+        <h2 style="font-weight: 700; font-size: 1.7rem; margin-bottom: 25px; color: var(--text-main); letter-spacing: -0.5px;">Add New Combo</h2>
+        <form id="addComboForm" enctype="multipart/form-data">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+            <div class="form-group" style="margin-bottom:0;">
+              <label>Combo Name</label>
+              <input type="text" id="comboName" placeholder="e.g. Family Pack" required />
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+              <label>Assign to Category</label>
+              <select id="comboAssignCategory" required style="width: 100%; height: 48px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; color: var(--text-main); padding: 0 12px; outline: none;">
+                <option value="" disabled selected>Select Category</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Select Items for Combo</label>
+            <div style="display:flex; gap:10px; margin-bottom:10px; align-items: center;">
+              <select id="comboCategorySelect" onchange="filterComboItems('comboCategorySelect', 'comboItemSelect')" style="width: 140px; height: 48px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; color: var(--text-main); padding: 0 12px; outline: none;">
+                <option value="All" selected>All Categories</option>
+              </select>
+              <select id="comboItemSelect" onchange="checkComboItemSize('comboItemSelect', 'comboItemSize')" style="flex-grow: 1; height: 48px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; color: var(--text-main); padding: 0 12px; outline: none;">
+                <option value="" disabled selected>Select an item</option>
+              </select>
+              <select id="comboItemSize" style="display: none; width: 100px; height: 48px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; color: var(--text-main); padding: 0 12px; outline: none;">
+                <option value="Quarter">Quarter</option>
+                <option value="Half">Half</option>
+                <option value="Full">Full</option>
+              </select>
+              <input type="number" id="comboItemQty" value="1" min="1" style="width: 70px; height: 48px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; color: var(--text-main); padding: 0 12px; outline: none; text-align: center;" />
+              <button type="button" class="primary-btn" onclick="addItemToCombo()" style="width: auto; height: 48px; padding: 0 20px; margin: 0; box-shadow: none; flex-shrink: 0;">Add</button>
+            </div>
+            <div id="comboItemsList" style="background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; padding: 10px; min-height: 50px; max-height: 150px; overflow-y: auto;">
+              <p style="text-align:center; color: var(--text-muted); font-size: 0.85rem; margin: 10px 0;">No items added yet</p>
+            </div>
+            <!-- Hidden textarea to store the stringified combo items for form submission -->
+            <textarea id="comboDescription" style="display:none;"></textarea>
+          </div>
+
+          <div class="form-group">
+            <label>Price</label>
+            <input type="number" step="0.01" id="comboPrice" placeholder="Enter combo price" required>
+          </div>
+          <div class="form-group">
+            <label>Upload Image</label>
+            <input type="file" id="comboImage" accept="image/*" />
+          </div>
+          <div style="display: flex; gap: 20px; margin-bottom: 25px;">
+            <label style="display: flex; align-items: center; gap: 8px; font-size: 0.9rem; font-weight: 600; cursor: pointer;">
+              <input type="checkbox" id="comboIsSpecial" style="width: 18px; height: 18px; accent-color: var(--primary);" /> Special
+            </label>
+            <label style="display: flex; align-items: center; gap: 8px; font-size: 0.9rem; font-weight: 600; cursor: pointer;">
+              <input type="checkbox" id="comboIsAvailable" checked style="width: 18px; height: 18px; accent-color: var(--primary);" /> Available
+            </label>
+          </div>
+          <button type="submit" class="primary-btn">Create Combo</button>
+        </form>
+        <p id="comboStatusMessage" class="message-text"></p>
+      </aside>
+
+      <!-- Right Column: Combo Items List -->
+      <section class="dashboard-card reveal" style="animation-delay: 0.1s;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; flex-wrap: wrap; gap: 15px;">
+          <h2 style="margin: 0; border: none; padding: 0;">Manage Combos</h2>
+        </div>
+        <div id="adminComboList" class="admin-menu-list">
+          <p style="text-align: center; color: var(--text-muted); padding: 40px;">Loading your combos...</p>
+        </div>
+      </section>
+    </div>
+
+    <!-- Orders Management Section -->
+    <div id="ordersSection" style="display: none;">
+      <section class="dashboard-card reveal">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; flex-wrap: wrap; gap: 20px;">
+          <h2 style="margin:0;">Incoming Orders</h2>
+          <div style="display: flex; gap: 10px; align-items: center;">
+            <span id="orderCountBadge" style="padding: 8px 14px; background: rgba(212, 93, 38, 0.15); border: 1px solid rgba(212, 93, 38, 0.3); border-radius: 8px; color: var(--primary); font-size: 0.85rem; font-weight: 700; font-family: 'Inter', sans-serif; display: inline-flex; align-items: center; gap: 6px;">
+              <span style="font-size: 1rem;">📋</span> Total Orders: <span id="orderCountNumber">0</span>
+            </span>
+            <input type="text" id="orderSearch" placeholder="Search orders..." oninput="filterOrders()" style="padding: 8px 12px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: var(--text-main); font-size: 0.9rem; width: 200px;">
+            <input type="date" id="orderDateFilter" onchange="filterOrders()" style="padding: 8px 12px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: var(--text-main); font-size: 0.9rem;">
+            <button type="button" class="refresh-btn" onclick="loadOrders()">
+              <span class="refresh-icon">🔄</span> Refresh
+            </button>
+          </div>
+        </div>
+
+        <!-- Interactive Status Filters & Order Counts -->
+        <div id="statusFiltersRow" style="display: flex; gap: 10px; margin-bottom: 25px; flex-wrap: wrap; align-items: center;">
+          <button type="button" class="status-filter-btn active" data-status="all" onclick="setStatusFilter('all')">
+            📋 Total: <span id="count-all">0</span>
+          </button>
+          <button type="button" class="status-filter-btn" data-status="Pending" onclick="setStatusFilter('Pending')">
+            ⏳ Pending: <span id="count-pending">0</span>
+          </button>
+          <button type="button" class="status-filter-btn" data-status="Accepted" onclick="setStatusFilter('Accepted')">
+            ✅ Accepted: <span id="count-accepted">0</span>
+          </button>
+          <button type="button" class="status-filter-btn" data-status="Delivered" onclick="setStatusFilter('Delivered')">
+            🚚 Delivered: <span id="count-delivered">0</span>
+          </button>
+          <button type="button" class="status-filter-btn" data-status="Completed" onclick="setStatusFilter('Completed')">
+            🎉 Completed: <span id="count-completed">0</span>
+          </button>
+          <button type="button" class="status-filter-btn" data-status="Cancelled" onclick="setStatusFilter('Cancelled')">
+            ❌ Cancelled: <span id="count-cancelled">0</span>
+          </button>
+        </div>
+        <div id="adminOrdersList" class="admin-menu-list">
+          <p style="text-align: center; color: var(--text-muted); padding: 40px;">No orders yet.</p>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <!-- Edit Modal -->
+  <div id="editModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Edit Dish Details</h2>
+        <button type="button" class="close-btn" onclick="closeEditModal()">&times;</button>
+      </div>
+      
+      <form id="editItemForm" enctype="multipart/form-data">
+        <input type="hidden" id="editItemId" />
+        
+        <div class="form-group">
+          <label>Item Name</label>
+          <input type="text" id="editItemName" placeholder="Dish name..." required />
+        </div>
+        
+        <div class="form-group" id="editDescriptionGroup">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <label style="margin-bottom: 0;">Description</label>
+            <button type="button" id="aiBtnEdit" onclick="generateDescriptionWithAI('editItemName', 'editCategory', 'editDescription', 'aiBtnEdit')" style="background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); color: #fcd34d; font-size: 0.75rem; padding: 4px 10px; border-radius: 6px; cursor: pointer; transition: 0.3s; display: flex; align-items: center; gap: 5px;">
+              ✨ Generate with AI
+            </button>
+          </div>
+          <textarea id="editDescription" rows="3" placeholder="Describe the flavors..."></textarea>
+        </div>
+        
+        <div class="form-group" id="editComboBuilderGroup" style="display:none; margin-bottom: 25px; padding: 15px; background: rgba(0,0,0,0.15); border-radius: 12px; border: 1px solid rgba(255,255,255,0.05);">
+          <label style="color: #fcd34d;">Combo Items Selection</label>
+          <div style="display: flex; gap: 10px; margin-bottom: 15px; align-items: stretch;">
+            <select id="editComboCategorySelect" onchange="filterComboItems('editComboCategorySelect', 'editComboItemSelect')" style="width: 130px; height: 48px; background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); color: var(--text-main); border-radius: 8px; padding: 0 10px;">
+              <option value="All" selected>All Categories</option>
+            </select>
+            <select id="editComboItemSelect" onchange="checkComboItemSize('editComboItemSelect', 'editComboItemSize')" style="flex: 1; height: 48px; background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); color: var(--text-main); border-radius: 8px; padding: 0 15px;">
+              <option value="" disabled selected>Select an item to add...</option>
+            </select>
+            <select id="editComboItemSize" style="display: none; width: 100px; height: 48px; background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); color: var(--text-main); border-radius: 8px; padding: 0 10px;">
+              <option value="Quarter">Quarter</option>
+              <option value="Half">Half</option>
+              <option value="Full">Full</option>
+            </select>
+            <input type="number" id="editComboItemQty" value="1" min="1" style="width: 70px; height: 48px; background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); color: var(--text-main); border-radius: 8px; padding: 0 10px; text-align: center;" />
+            <button type="button" onclick="addEditItemToCombo()" style="background: var(--primary); color: var(--text-main); border: none; border-radius: 8px; padding: 0 20px; font-weight: 600; cursor: pointer; height: 48px;">Add</button>
+          </div>
+          <div id="editComboItemsList" style="display: flex; flex-direction: column; gap: 8px;">
+            <p style="color: var(--text-muted); font-size: 0.85rem; margin: 0; text-align: center; padding: 10px;">No items added to this combo yet.</p>
+          </div>
+          <textarea id="editComboDescription" style="display:none;"></textarea>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
+          <div class="form-group" style="margin-bottom:0;">
+            <label>Category</label>
+            <select id="editCategory" required>
+              <option value="" selected>Select Category</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label>Food Type</label>
+            <select id="editFoodType" required>
+              <option value="" selected>Select Type</option>
+              <option value="Veg">Pure Veg</option>
+              <option value="Non-Veg">Non-Veg</option>
+              <option value="Combo">Combo</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Price (Default/Single)</label>
+          <input type="number" step="0.01" id="editPrice" required>
+        </div>
+        <div id="editTieredPriceContainer" style="display: none; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 20px;">
+          <div class="form-group" style="margin-bottom:0;">
+            <label style="font-size: 0.75rem;">Price (Quarter)</label>
+            <input type="number" step="0.01" id="editPriceQuarter" placeholder="Quarter">
+          </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label style="font-size: 0.75rem;">Price (Half)</label>
+            <input type="number" step="0.01" id="editPriceHalf" placeholder="Half">
+          </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label style="font-size: 0.75rem;">Price (Full)</label>
+            <input type="number" step="0.01" id="editPriceFull" placeholder="Full">
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label>Update Image</label>
+          <div class="image-upload-wrapper">
+            <input type="file" id="editItemImage" accept="image/*" />
+            <div id="currentImagePreview" class="image-preview-container"></div>
+            <label class="remove-image-label">
+              <input type="checkbox" id="removeImage" />
+              <span>Remove existing image</span>
+            </label>
+          </div>
+        </div>
+        
+        <div class="form-checkbox-row">
+          <label class="custom-checkbox">
+            <input type="checkbox" id="editIsSpecial" />
+            <span>Special</span>
+          </label>
+          <label class="custom-checkbox">
+            <input type="checkbox" id="editIsAvailable" />
+            <span>Available</span>
+          </label>
+        </div>
+        
+        <div class="modal-actions">
+          <button type="submit" class="primary-btn">Save Changes</button>
+          <button type="button" class="cancel-btn" onclick="closeEditModal()">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Quick Add Item Modal (for Add-ons) -->
+  <div id="quickAddModal" class="modal">
+    <div class="modal-content" style="max-width: 400px; background: #0f172a;">
+      <div class="modal-header">
+        <h2 style="color: var(--primary);">➕ Quick Add Item</h2>
+        <button type="button" class="small-btn delete-btn" onclick="closeQuickAdd()">&times;</button>
+      </div>
+      <form id="quickAddForm" style="padding: 20px;">
+        <input type="hidden" id="quickAddOrderId" />
+        <div class="form-group" style="margin-bottom: 20px;">
+          <label style="color: var(--text-main); display: block; margin-bottom: 8px;">Select Category</label>
+          <select id="quickAddCategorySelect" onchange="filterQuickAddItems()" style="width: 100%; padding: 12px; border-radius: 8px; background: #1e293b; color: var(--text-main); border: 1px solid #334155;">
+            <!-- Categories populated via JS -->
+            <option value="All">All Categories</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin-bottom: 20px;">
+          <label style="color: var(--text-main); display: block; margin-bottom: 8px;">Select Food / Add-on</label>
+          <select id="quickAddItemSelect" style="width: 100%; padding: 12px; border-radius: 8px; background: #1e293b; color: var(--text-main); border: 1px solid #334155;" required>
+            <!-- Menu items populated via JS -->
+          </select>
+        </div>
+        <div class="form-group" style="margin-bottom: 25px;">
+          <label style="color: var(--text-main); display: block; margin-bottom: 8px;">Quantity</label>
+          <input type="number" id="quickAddQuantity" value="1" min="1" style="width: 100%; padding: 12px; border-radius: 8px; background: #1e293b; color: var(--text-main); border: 1px solid #334155;" required />
+        </div>
+        <div style="display: flex; gap: 12px;">
+          <button type="submit" class="primary-btn" style="flex: 1;">Add to Order</button>
+          <button type="button" class="small-btn edit-btn" onclick="closeQuickAdd()" style="padding: 12px 20px;">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+
+  <!-- Take Order Modal - Premium Redesign -->
+  <div id="takeOrderModal" class="modal">
+    <div class="modal-content take-order-modal-content">
+
+      <!-- ── Modal Header ── -->
+      <div class="tom-header">
+        <div class="tom-header-left">
+          <div class="tom-header-icon">🛍️</div>
+          <div>
+            <h2 class="tom-title">Take New Order</h2>
+            <p class="tom-subtitle">Fill in the details to place an order</p>
+          </div>
+        </div>
+        <button type="button" class="tom-close-btn" onclick="closeTakeOrderModal()">&#x2715;</button>
+      </div>
+
+      <div class="tom-body">
+
+        <!-- ── Order Type Pill Toggle ── -->
+        <div class="tom-section">
+          <label class="tom-label">Order Type <span style="color: #f97316;">*</span></label>
+          <div class="tom-order-type-toggle">
+            <button type="button" id="typeBtnDineIn" class="tom-type-btn" onclick="setNewOrderType('Dine-in')">
+              <span class="tom-type-icon">🍽️</span> Dine-in
+            </button>
+            <button type="button" id="typeBtnParcel" class="tom-type-btn active" onclick="setNewOrderType('Parcel')">
+              <span class="tom-type-icon">🛍️</span> Parcel
+            </button>
+          </div>
+          <input type="hidden" id="newOrderType" value="Parcel" />
+        </div>
+
+        <!-- ── Table Number (Dynamic) ── -->
+        <div class="tom-section" id="newOrderTableGroup" style="display: none;">
+          <label class="tom-label">Table Number <span style="color: #f97316;">*</span></label>
+          <div class="tom-input-wrapper">
+            <span class="tom-input-icon">🪑</span>
+            <input type="text" id="newOrderTableNumber" placeholder="e.g. 5, 12, A1" class="tom-input" />
+          </div>
+        </div>
+
+        <!-- ── Customer Phone ── -->
+        <div class="tom-section">
+          <label class="tom-label">Phone Number <span style="color: #f97316;">*</span></label>
+          <div class="tom-input-wrapper">
+            <span class="tom-input-icon">📞</span>
+            <input type="tel" id="newOrderCustomer" placeholder="Enter 10-digit phone number" class="tom-input" maxlength="10" oninput="this.value = this.value.replace(/[^0-9]/g, '')" />
+          </div>
+        </div>
+
+        <!-- ── Item Selector ── -->
+        <div class="tom-select-section">
+          <label class="tom-label" style="color: #f97316; margin-bottom: 14px; display: block;">🛒 Select Items</label>
+          <div class="tom-select-row">
+            <select id="modalCategorySelect" onchange="filterModalItems()" class="tom-select tom-select-sm">
+              <option value="All" selected>All Categories</option>
+            </select>
+            <select id="modalItemSelect" class="tom-select tom-select-grow">
+              <!-- Populated by JS -->
+            </select>
+            <input type="number" id="modalItemQty" value="1" min="1" class="tom-qty-input" />
+            <button type="button" onclick="addItemToNewOrder()" class="tom-add-btn">
+              <span>+</span> Add
+            </button>
+          </div>
+        </div>
+
+        <!-- ── Items List ── -->
+        <div id="newOrderItemsList" class="tom-items-list">
+          <div class="tom-empty-state">
+            <span class="tom-empty-icon">🛒</span>
+            <p>No items added yet</p>
+          </div>
+        </div>
+
+        <!-- ── Total ── -->
+        <div class="tom-total-bar">
+          <div>
+            <span class="tom-total-label">TOTAL AMOUNT</span>
+            <span class="tom-total-sub">Inc. all charges</span>
+          </div>
+          <span id="newOrderTotal" class="tom-total-value">₹0.00</span>
+        </div>
+
+        <!-- ── Actions ── -->
+        <div class="tom-actions">
+          <button type="button" class="tom-place-btn" onclick="submitNewOrder()">
+            ✅ Place Order
+          </button>
+          <button type="button" class="tom-cancel-btn" onclick="closeTakeOrderModal()">Cancel</button>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+    <!-- Category Management Modal -->
+    <div id="categoryModal" class="modal" style="display:none; position: fixed; inset:0; z-index:9999; align-items:center; justify-content:center; background: rgba(5, 5, 15, 0.95); backdrop-filter: blur(12px);">
+      <div class="modal-content" style="background: #111827; width: 92%; max-width: 420px; padding: 35px; border-radius: 28px; border: 1px solid rgba(212, 93, 38, 0.3); box-shadow: 0 25px 60px rgba(0,0,0,0.8); animation: cosmicReveal 0.4s var(--ease-out-back);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 15px;">
+          <h2 style="margin:0; font-family: 'Outfit'; color: var(--text-main); display: flex; align-items: center; gap: 12px;">
+            <span style="font-size: 1.5rem;">⚙️</span> Categories
+          </h2>
+          <button type="button" onclick="closeCategoryModal()" style="background: rgba(255,255,255,0.05); border: none; font-size: 1.8rem; cursor:pointer; color: var(--text-muted); width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: 0.3s;">&times;</button>
+        </div>
+        <div id="categoryManagementList" style="max-height: 50vh; overflow-y: auto; margin-bottom: 20px; padding-right: 5px;">
+          <!-- Categories with Delete buttons injected here -->
+        </div>
+        <div style="background: rgba(212, 93, 38, 0.05); padding: 15px; border-radius: 12px; border: 1px solid rgba(212, 93, 38, 0.1);">
+           <p style="font-size: 0.75rem; color: var(--text-muted); text-align: center; margin: 0;">Deleting a category will not delete its items, but they will become uncategorized.</p>
+        </div>
+      </div>
+    </div>
+
+    <script src="js/dashboard.js"></script>
+    <script>
+      // ── Theme System ──
+      const THEME_KEY = 'nighteat-theme';
+
+      function applyTheme(theme) {
+        document.body.setAttribute('data-theme', theme);
+        const btn = document.getElementById('themeToggleBtn');
+        if (btn) {
+          btn.textContent = theme === 'light' ? '☀️' : '🌙';
+          btn.style.background = theme === 'light'
+            ? 'rgba(0,0,0,0.07)'
+            : 'rgba(255,255,255,0.07)';
+          btn.style.borderColor = theme === 'light'
+            ? 'rgba(0,0,0,0.12)'
+            : 'rgba(255,255,255,0.1)';
+        }
+      }
+
+      function toggleTheme() {
+        const current = document.body.getAttribute('data-theme') || 'dark';
+        const next = current === 'dark' ? 'light' : 'dark';
+        localStorage.setItem(THEME_KEY, next);
+        applyTheme(next);
+      }
+
+      // Apply saved theme immediately on load
+      (function() {
+        const saved = localStorage.getItem(THEME_KEY) || 'dark';
+        applyTheme(saved);
+      })();
+    </script>
+</body>
+</html>

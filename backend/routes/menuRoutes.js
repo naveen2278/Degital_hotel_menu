@@ -65,7 +65,7 @@ router.get('/admin/all', authMiddleware, async (req, res) => {
 /* ADMIN: ADD NEW MENU ITEM WITH IMAGE */
 router.post('/', authMiddleware, upload.single('image'), async (req, res) => {
   const { item_name, description, price, price_quarter, price_half, price_full, category, food_type, is_special, is_available } = req.body;
-  const image_path = req.file ? `/uploads/menu/${req.file.filename}` : null;
+  const image_path = req.file ? `/uploads/${req.file.filename}` : null;
 
   const sql = `
     INSERT INTO menu_items (item_name, description, price, price_quarter, price_half, price_full, category, food_type, is_special, is_available, image_path)
@@ -107,7 +107,7 @@ router.put('/:id', authMiddleware, upload.single('image'), async (req, res) => {
   
   let image_path = null;
   if (req.file) {
-    image_path = `/uploads/menu/${req.file.filename}`;
+    image_path = `/uploads/${req.file.filename}`;
   }
 
   const isSpecialInt = (is_special === 'true' || is_special === true) ? 1 : 0;
@@ -159,6 +159,4 @@ router.delete('/:id', authMiddleware, async (req, res) => {
   }
 });
 
-module.exports = router;
-
-module.exports = router;
+module.exports = router;

@@ -1,0 +1,79 @@
+-- --------------------------------------------------------
+-- Database Creation
+-- --------------------------------------------------------
+
+-- If your hosting provider already created the database, you might not need this line
+-- But it's good practice. Make sure you select the database before running the tables.
+-- CREATE DATABASE IF NOT EXISTS u943133069_hotelmenu;
+USE u943133069_hotelmenu;
+
+-- --------------------------------------------------------
+-- Table Structure for `admin`
+-- --------------------------------------------------------
+CREATE TABLE IF NOT EXISTS admin (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    username VARCHAR(100) NOT NULL UNIQUE,
+    password VARCHAR(255) NOT NULL
+);
+
+-- Insert Default Admin User
+INSERT IGNORE INTO admin (username, password) VALUES ('admin', 'admin123');
+
+-- --------------------------------------------------------
+-- Table Structure for `categories`
+-- --------------------------------------------------------
+CREATE TABLE IF NOT EXISTS categories (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    name VARCHAR(100) NOT NULL UNIQUE
+);
+
+-- Insert Default Categories
+INSERT IGNORE INTO categories (name) VALUES 
+('Biryani'), ('Rice'), ('Noodles'), ('Grill'), ('Tandoori'), ('Gravy'), ('Starters');
+
+-- --------------------------------------------------------
+-- Table Structure for `menu_items`
+-- --------------------------------------------------------
+CREATE TABLE IF NOT EXISTS menu_items (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    item_name VARCHAR(150) NOT NULL,
+    description TEXT,
+    price DECIMAL(10,2) NOT NULL,
+    price_quarter DECIMAL(10,2) DEFAULT NULL,
+    price_half DECIMAL(10,2) DEFAULT NULL,
+    price_full DECIMAL(10,2) DEFAULT NULL,
+    category VARCHAR(100) NOT NULL,
+    food_type ENUM('Veg', 'Non-Veg', 'Combo') NOT NULL DEFAULT 'Veg',
+    is_special TINYINT(1) DEFAULT 0,
+    is_available TINYINT(1) DEFAULT 1,
+    image_path VARCHAR(255) DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- --------------------------------------------------------
+-- Table Structure for `orders`
+-- --------------------------------------------------------
+CREATE TABLE IF NOT EXISTS orders (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    daily_order_number INT DEFAULT NULL,
+    table_number VARCHAR(20) NOT NULL,
+    total_amount DECIMAL(10,2) NOT NULL,
+    status ENUM('Pending', 'Accepted', 'Processing', 'Delivered', 'Completed', 'Cancelled') DEFAULT 'Pending',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    customer_name VARCHAR(100) DEFAULT NULL,
+    order_type ENUM('Dine-in', 'Parcel') DEFAULT 'Dine-in'
+);
+
+-- --------------------------------------------------------
+-- Table Structure for `order_items`
+-- --------------------------------------------------------
+CREATE TABLE IF NOT EXISTS order_items (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    order_id INT NOT NULL,
+    item_id INT NOT NULL,
+    quantity INT NOT NULL,
+    price DECIMAL(10,2) NOT NULL,
+    FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
+    FOREIGN KEY (item_id) REFERENCES menu_items(id)
+);

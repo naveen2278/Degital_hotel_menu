@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NightEat - Admin Login</title>
+  <link rel="icon" type="image/png" href="favicon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;800&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --primary: #d45d26;
+      --primary-dark: #b64111;
+      --primary-glow: rgba(212, 93, 38, 0.4);
+      --accent: #f97316;
+      --bg: #05050f;
+      --card-bg: rgba(10, 12, 22, 0.85);
+      --glass: rgba(255,255,255,0.04);
+      --glass-border: rgba(255,255,255,0.08);
+      --text: #f0f4f8;
+      --muted: #7a8ba4;
+      --input-bg: rgba(255,255,255,0.04);
+      --input-border: rgba(255,255,255,0.1);
+      --success: #10b981;
+      --danger: #ef4444;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      min-height: 100vh;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* ── Animated Star Field ── */
+    #starfield {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      overflow: hidden;
+    }
+
+    .star {
+      position: absolute;
+      border-radius: 50%;
+      background: white;
+      animation: twinkle var(--d) infinite ease-in-out;
+      opacity: 0;
+    }
+
+    @keyframes twinkle {
+      0%, 100% { opacity: 0; transform: scale(0.5); }
+      50% { opacity: var(--o); transform: scale(1); }
+    }
+
+    /* ── Glowing Orbs ── */
+    .orb {
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(80px);
+      z-index: 0;
+      animation: orbDrift 20s infinite alternate ease-in-out;
+    }
+    .orb-1 {
+      width: 500px; height: 500px;
+      background: radial-gradient(circle, rgba(212,93,38,0.18) 0%, transparent 70%);
+      top: -150px; left: -150px;
+      animation-delay: 0s;
+    }
+    .orb-2 {
+      width: 400px; height: 400px;
+      background: radial-gradient(circle, rgba(168,85,247,0.12) 0%, transparent 70%);
+      bottom: -100px; right: -100px;
+      animation-delay: -7s;
+    }
+    .orb-3 {
+      width: 300px; height: 300px;
+      background: radial-gradient(circle, rgba(59,130,246,0.08) 0%, transparent 70%);
+      top: 40%; left: 55%;
+      animation-delay: -14s;
+    }
+
+    @keyframes orbDrift {
+      0%   { transform: translate(0, 0) scale(1); }
+      33%  { transform: translate(80px, 40px) scale(1.1); }
+      66%  { transform: translate(-40px, 120px) scale(0.9); }
+      100% { transform: translate(0, 0) scale(1); }
+    }
+
+    /* ── Grid Lines ── */
+    .grid-lines {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      background-image:
+        linear-gradient(rgba(212,93,38,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(212,93,38,0.03) 1px, transparent 1px);
+      background-size: 60px 60px;
+    }
+
+    /* ── Floating Food Icons ── */
+    .float-icon {
+      position: fixed;
+      font-size: 2rem;
+      opacity: 0.06;
+      z-index: 0;
+      animation: floatRandom var(--fd) infinite ease-in-out;
+      animation-delay: var(--fdelay);
+      user-select: none;
+      pointer-events: none;
+    }
+
+    @keyframes floatRandom {
+      0%, 100% { transform: translateY(0) rotate(0deg); }
+      33%       { transform: translateY(-30px) rotate(10deg); }
+      66%       { transform: translateY(20px) rotate(-8deg); }
+    }
+
+    /* ── Main Login Card ── */
+    .login-wrapper {
+      position: relative;
+      z-index: 10;
+      width: 100%;
+      max-width: 480px;
+      padding: 20px;
+      animation: cardEntrance 0.9s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    }
+
+    @keyframes cardEntrance {
+      0%   { opacity: 0; transform: translateY(50px) scale(0.92); }
+      100% { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    .login-card {
+      background: var(--card-bg);
+      backdrop-filter: blur(30px);
+      border: 1px solid var(--glass-border);
+      border-radius: 32px;
+      padding: 48px 44px;
+      box-shadow:
+        0 0 0 1px rgba(212,93,38,0.06),
+        0 30px 60px rgba(0,0,0,0.7),
+        0 0 80px rgba(212,93,38,0.05) inset;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Card inner glow line */
+    .login-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 20%; right: 20%; height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(212,93,38,0.6), transparent);
+    }
+
+    /* ── Logo Area ── */
+    .logo-area {
+      text-align: center;
+      margin-bottom: 36px;
+    }
+
+    .logo-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 80px; height: 80px;
+      border-radius: 24px;
+      background: rgba(212,93,38,0.1);
+      border: 1px solid rgba(212,93,38,0.2);
+      font-size: 2.2rem;
+      margin-bottom: 20px;
+      position: relative;
+      animation: iconPulse 3s infinite ease-in-out;
+      box-shadow: 0 0 40px rgba(212,93,38,0.15), inset 0 1px 0 rgba(255,255,255,0.1);
+    }
+
+    .logo-icon::after {
+      content: '';
+      position: absolute;
+      inset: -4px;
+      border-radius: 28px;
+      border: 1px solid rgba(212,93,38,0.15);
+      animation: ringPulse 3s infinite ease-in-out;
+    }
+
+    @keyframes iconPulse {
+      0%, 100% { box-shadow: 0 0 30px rgba(212,93,38,0.15), inset 0 1px 0 rgba(255,255,255,0.1); }
+      50% { box-shadow: 0 0 50px rgba(212,93,38,0.35), inset 0 1px 0 rgba(255,255,255,0.1); }
+    }
+
+    @keyframes ringPulse {
+      0%, 100% { opacity: 0.3; transform: scale(1); }
+      50% { opacity: 0.7; transform: scale(1.05); }
+    }
+
+    .logo-area h1 {
+      font-family: 'Outfit', sans-serif;
+      font-size: 1.9rem;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      color: var(--text);
+      margin-bottom: 6px;
+    }
+
+    .logo-area h1 span {
+      background: linear-gradient(135deg, #d45d26, #f97316, #d45d26);
+      background-size: 200% 200%;
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      animation: shimmer 4s ease infinite;
+    }
+
+    @keyframes shimmer {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+
+    .logo-area p {
+      font-size: 0.9rem;
+      color: var(--muted);
+      font-weight: 400;
+      letter-spacing: 0.3px;
+    }
+
+    /* ── Divider ── */
+    .divider {
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.07), transparent);
+      margin-bottom: 32px;
+    }
+
+    /* ── Form Fields ── */
+    .field-group {
+      margin-bottom: 20px;
+    }
+
+    .field-label {
+      display: block;
+      font-size: 0.78rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--muted);
+      margin-bottom: 10px;
+      transition: color 0.3s;
+    }
+
+    .field-wrapper {
+      position: relative;
+    }
+
+    .field-icon {
+      position: absolute;
+      left: 16px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 1rem;
+      opacity: 0.5;
+      pointer-events: none;
+      transition: opacity 0.3s;
+    }
+
+    .field-input {
+      width: 100%;
+      padding: 15px 18px 15px 46px;
+      background: var(--input-bg);
+      border: 1px solid var(--input-border);
+      border-radius: 14px;
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+      font-size: 0.97rem;
+      outline: none;
+      transition: all 0.3s ease;
+    }
+
+    .field-input::placeholder {
+      color: rgba(255,255,255,0.2);
+    }
+
+    .field-input:focus {
+      border-color: rgba(212,93,38,0.5);
+      background: rgba(212,93,38,0.05);
+      box-shadow: 0 0 0 3px rgba(212,93,38,0.1), 0 0 20px rgba(212,93,38,0.08);
+    }
+
+    .field-group:focus-within .field-label {
+      color: rgba(212,93,38,0.9);
+    }
+
+    .field-group:focus-within .field-icon {
+      opacity: 0.9;
+    }
+
+    /* Eye Toggle */
+    .eye-toggle {
+      position: absolute;
+      right: 16px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--muted);
+      font-size: 1rem;
+      padding: 4px;
+      transition: color 0.2s;
+      display: flex;
+      align-items: center;
+    }
+    .eye-toggle:hover { color: var(--text); }
+
+    /* ── Submit Button ── */
+    .submit-btn {
+      width: 100%;
+      padding: 16px;
+      margin-top: 8px;
+      background: linear-gradient(135deg, #d45d26 0%, #b64111 100%);
+      color: white;
+      border: none;
+      border-radius: 14px;
+      font-family: 'Outfit', sans-serif;
+      font-size: 1.05rem;
+      font-weight: 700;
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+      transition: all 0.3s ease;
+      box-shadow: 0 8px 25px rgba(212,93,38,0.35);
+      letter-spacing: 0.5px;
+    }
+
+    .submit-btn::before {
+      content: '';
+      position: absolute;
+      top: 0; left: -100%;
+      width: 100%; height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent);
+      transition: left 0.5s ease;
+    }
+
+    .submit-btn:hover::before { left: 100%; }
+
+    .submit-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 14px 35px rgba(212,93,38,0.5);
+      background: linear-gradient(135deg, #e0672d 0%, #c5501a 100%);
+    }
+
+    .submit-btn:active { transform: translateY(0); }
+
+    .submit-btn.loading {
+      pointer-events: none;
+      opacity: 0.8;
+    }
+
+    .btn-inner {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+
+    .btn-spinner {
+      display: none;
+      width: 18px; height: 18px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+
+    .submit-btn.loading .btn-spinner { display: block; }
+    .submit-btn.loading .btn-text { opacity: 0.7; }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Message ── */
+    #loginMessage {
+      text-align: center;
+      margin-top: 16px;
+      padding: 12px 16px;
+      border-radius: 10px;
+      font-size: 0.88rem;
+      font-weight: 500;
+      display: none;
+      animation: msgPop 0.3s ease;
+    }
+
+    @keyframes msgPop {
+      from { opacity: 0; transform: scale(0.95); }
+      to   { opacity: 1; transform: scale(1); }
+    }
+
+    #loginMessage.error {
+      display: block;
+      background: rgba(239,68,68,0.1);
+      border: 1px solid rgba(239,68,68,0.2);
+      color: #fca5a5;
+    }
+
+    #loginMessage.success {
+      display: block;
+      background: rgba(16,185,129,0.1);
+      border: 1px solid rgba(16,185,129,0.2);
+      color: #6ee7b7;
+    }
+
+    /* ── Footer ── */
+    .card-footer {
+      margin-top: 28px;
+      text-align: center;
+      font-size: 0.78rem;
+      color: rgba(255,255,255,0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .card-footer::before,
+    .card-footer::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: rgba(255,255,255,0.06);
+    }
+
+    /* ── Credentials hint ── */
+    .hint-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 14px;
+      padding: 7px 14px;
+      background: rgba(212,93,38,0.07);
+      border: 1px solid rgba(212,93,38,0.12);
+      border-radius: 8px;
+      font-size: 0.75rem;
+      color: rgba(212,93,38,0.7);
+      font-weight: 500;
+    }
+
+    /* ── Theme toggle floating button ── */
+    #adminThemeBtn {
+      position: fixed;
+      top: 20px; right: 20px;
+      width: 44px; height: 44px;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.12);
+      background: rgba(255,255,255,0.07);
+      backdrop-filter: blur(10px);
+      cursor: pointer;
+      font-size: 1.2rem;
+      display: flex; align-items: center; justify-content: center;
+      z-index: 100;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    }
+    #adminThemeBtn:hover {
+      transform: scale(1.1);
+      box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+    }
+
+    /* ── Light theme overrides for login page ── */
+    body[data-theme="light"] {
+      background: linear-gradient(135deg, #fdf6ef 0%, #f4ede0 50%, #ede8f0 100%) !important;
+    }
+    body[data-theme="light"] .login-card {
+      background: rgba(255,255,255,0.92) !important;
+      border-color: rgba(0,0,0,0.08) !important;
+      box-shadow: 0 30px 60px rgba(0,0,0,0.12), 0 0 0 1px rgba(0,0,0,0.04) !important;
+    }
+    body[data-theme="light"] .login-card::before {
+      background: linear-gradient(90deg, transparent, rgba(212,93,38,0.4), transparent);
+    }
+    body[data-theme="light"] #adminThemeBtn {
+      background: rgba(0,0,0,0.06);
+      border-color: rgba(0,0,0,0.1);
+    }
+    body[data-theme="light"] .grid-lines {
+      background-image:
+        linear-gradient(rgba(0,0,0,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,0,0,0.04) 1px, transparent 1px);
+    }
+    body[data-theme="light"] #starfield { display: none; }
+    body[data-theme="light"] .orb-1 {
+      background: radial-gradient(circle, rgba(212,93,38,0.07) 0%, transparent 70%);
+    }
+    body[data-theme="light"] .orb-2 {
+      background: radial-gradient(circle, rgba(168,85,247,0.04) 0%, transparent 70%);
+    }
+    body[data-theme="light"] .float-icon { opacity: 0.04; }
+    body[data-theme="light"] .divider {
+      background: linear-gradient(90deg, transparent, rgba(0,0,0,0.1), transparent);
+    }
+    body[data-theme="light"] .card-footer {
+      color: rgba(0,0,0,0.22) !important;
+    }
+    body[data-theme="light"] .card-footer::before,
+    body[data-theme="light"] .card-footer::after {
+      background: rgba(0,0,0,0.08);
+    }
+
+    /* Smooth transitions on login page */
+    body, body *, .login-card, .field-input {
+      transition: background-color 0.35s ease, color 0.35s ease,
+                  border-color 0.35s ease, box-shadow 0.35s ease !important;
+    }
+
+    /* ── Mobile Responsive Overrides ── */
+    @media (max-width: 576px) {
+      .login-wrapper {
+        padding: 12px;
+      }
+      .login-card {
+        padding: 32px 20px 24px 20px;
+        border-radius: 24px;
+        box-shadow:
+          0 0 0 1px rgba(212,93,38,0.06),
+          0 20px 40px rgba(0,0,0,0.6) !important;
+      }
+      .logo-area {
+        margin-bottom: 24px;
+      }
+      .logo-icon {
+        width: 64px;
+        height: 64px;
+        font-size: 1.8rem;
+        margin-bottom: 12px;
+        border-radius: 18px;
+      }
+      .logo-area h1 {
+        font-size: 1.6rem;
+      }
+      .logo-area p {
+        font-size: 0.82rem;
+      }
+      .divider {
+        margin-bottom: 24px;
+      }
+      .field-group {
+        margin-bottom: 16px;
+      }
+      .field-label {
+        font-size: 0.72rem;
+        margin-bottom: 8px;
+      }
+      .field-input {
+        padding: 13px 15px 13px 42px;
+        font-size: 0.92rem;
+        border-radius: 10px;
+      }
+      .submit-btn {
+        padding: 14px;
+        font-size: 0.98rem;
+        border-radius: 10px;
+      }
+      .card-footer {
+        margin-top: 20px;
+        font-size: 0.72rem;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Theme Toggle Button -->
+  <button id="adminThemeBtn" onclick="toggleAdminTheme()" title="Toggle theme">🌙</button>
+
+  <!-- Animated Starfield -->
+  <div id="starfield"></div>
+
+  <!-- Glowing Orbs -->
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="orb orb-3"></div>
+
+  <!-- Grid Lines -->
+  <div class="grid-lines"></div>
+
+  <!-- Floating Food Icons -->
+  <div class="float-icon" style="top:8%; left:6%;  --fd:8s;  --fdelay:-2s;">🍛</div>
+  <div class="float-icon" style="top:15%; right:8%; --fd:11s; --fdelay:-5s;">🥘</div>
+  <div class="float-icon" style="bottom:18%; left:10%;--fd:9s;  --fdelay:-1s;">🍖</div>
+  <div class="float-icon" style="bottom:12%; right:6%;--fd:12s; --fdelay:-7s;">🍜</div>
+  <div class="float-icon" style="top:40%; left:3%; --fd:10s; --fdelay:-4s;">🍲</div>
+  <div class="float-icon" style="top:55%; right:4%;--fd:7s;  --fdelay:-3s;">🫕</div>
+
+  <!-- Login Card -->
+  <div class="login-wrapper">
+    <div class="login-card">
+
+      <!-- Logo -->
+      <div class="logo-area">
+        <div class="logo-icon">🔐</div>
+        <h1>Night<span>Eat</span></h1>
+        <p>Secure Admin Portal · Menu Management System</p>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- Form -->
+      <form id="loginForm" autocomplete="off">
+
+        <div class="field-group">
+          <label class="field-label" for="username">Username</label>
+          <div class="field-wrapper">
+            <span class="field-icon">👤</span>
+            <input
+              class="field-input"
+              type="text"
+              id="username"
+              placeholder="Enter your username"
+              required
+              autocomplete="username"
+            />
+          </div>
+        </div>
+
+        <div class="field-group">
+          <label class="field-label" for="password">Password</label>
+          <div class="field-wrapper">
+            <span class="field-icon">🔑</span>
+            <input
+              class="field-input"
+              type="password"
+              id="password"
+              placeholder="••••••••••"
+              required
+              autocomplete="current-password"
+            />
+            <button type="button" class="eye-toggle" id="eyeToggle" aria-label="Toggle password">👁️</button>
+          </div>
+        </div>
+
+        <button type="submit" class="submit-btn" id="submitBtn">
+          <div class="btn-inner">
+            <div class="btn-spinner"></div>
+            <span class="btn-text">Sign In to Dashboard</span>
+            <span class="btn-arrow">→</span>
+          </div>
+        </button>
+
+      </form>
+
+      <p id="loginMessage"></p>
+
+      <div class="card-footer">NightEat Restaurant Management</div>
+
+    </div>
+  </div>
+
+  <script>
+    // ── Starfield Generator ──
+    const starfield = document.getElementById('starfield');
+    for (let i = 0; i < 120; i++) {
+      const star = document.createElement('div');
+      star.className = 'star';
+      const size = Math.random() * 2.5 + 0.5;
+      const duration = (Math.random() * 4 + 2).toFixed(1) + 's';
+      const delay = (Math.random() * 6).toFixed(1) + 's';
+      const opacity = (Math.random() * 0.5 + 0.2).toFixed(2);
+      star.style.cssText = `
+        width:${size}px; height:${size}px;
+        top:${Math.random()*100}%;
+        left:${Math.random()*100}%;
+        --d:${duration}; --o:${opacity};
+        animation-delay:${delay};
+      `;
+      starfield.appendChild(star);
+    }
+
+    // ── Eye Toggle ──
+    document.getElementById('eyeToggle').addEventListener('click', () => {
+      const pw = document.getElementById('password');
+      const btn = document.getElementById('eyeToggle');
+      if (pw.type === 'password') {
+        pw.type = 'text';
+        btn.textContent = '🙈';
+      } else {
+        pw.type = 'password';
+        btn.textContent = '👁️';
+      }
+    });
+
+    // ── API ──
+    const SERVER_URL = window.location.origin;
+    const API_BASE = `${SERVER_URL}/api`;
+
+    // ── Login ──
+    document.getElementById('loginForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
+
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value.trim();
+      const msgEl    = document.getElementById('loginMessage');
+      const btn      = document.getElementById('submitBtn');
+
+      // Loading state
+      btn.classList.add('loading');
+      msgEl.className = '';
+      msgEl.style.display = 'none';
+
+      try {
+        const response = await fetch(`${API_BASE}/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+          msgEl.textContent = '✓ Login successful! Redirecting...';
+          msgEl.className = 'success';
+          localStorage.setItem('isAdminLoggedIn', 'true');
+          sessionStorage.setItem('isAdminLoggedIn', 'true');
+          document.cookie = "isAdminLoggedIn=true; path=/; max-age=86400";
+          setTimeout(() => { window.location.href = 'dashboard.html'; }, 800);
+        } else {
+          btn.classList.remove('loading');
+          msgEl.textContent = '✗ ' + (result.message || 'Invalid credentials. Please try again.');
+          msgEl.className = 'error';
+          // Shake the card
+          const card = document.querySelector('.login-card');
+          card.style.animation = 'shake 0.4s ease';
+          setTimeout(() => card.style.animation = '', 400);
+        }
+      } catch (error) {
+        btn.classList.remove('loading');
+        msgEl.textContent = '✗ Cannot connect to server. Is the server running?';
+        msgEl.className = 'error';
+      }
+    });
+
+    // ── Theme System (shared with dashboard) ──
+    const THEME_KEY = 'nighteat-theme';
+
+    function applyAdminTheme(theme) {
+      document.body.setAttribute('data-theme', theme);
+      const btn = document.getElementById('adminThemeBtn');
+      if (btn) btn.textContent = theme === 'light' ? '☀️' : '🌙';
+    }
+
+    function toggleAdminTheme() {
+      const current = document.body.getAttribute('data-theme') || 'dark';
+      const next = current === 'dark' ? 'light' : 'dark';
+      localStorage.setItem(THEME_KEY, next);
+      applyAdminTheme(next);
+    }
+
+    // Apply saved theme on load
+    (function() {
+      const saved = localStorage.getItem(THEME_KEY) || 'dark';
+      applyAdminTheme(saved);
+    })();
+  </script>
+
+  <style>
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      20%       { transform: translateX(-8px); }
+      40%       { transform: translateX(8px); }
+      60%       { transform: translateX(-5px); }
+      80%       { transform: translateX(5px); }
+    }
+  </style>
+</body>
+</html>

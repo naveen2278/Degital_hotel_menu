@@ -11,15 +11,35 @@ router.post('/', async (req, res) => {
     return res.status(400).json({ success: false, message: 'Invalid order data' });
   }
 
+  try {
+    const [statusRows] = await db.promise().query("SELECT key_value FROM settings WHERE key_name = 'parcel_status' LIMIT 1");
+    const parcelStatus = statusRows.length > 0 ? statusRows[0].key_value : 'open';
+    if ((order_type || 'Dine-in') === 'Parcel' && parcelStatus === 'closed') {
+      return res.status(400).json({
+        success: false,
+        message: 'Parcel ordering is currently closed. Please choose Dine-in or try again later.'
+      });
+    }
+  } catch (err) {
+    console.error('PARCEL STATUS CHECK ERROR:', err);
+    return res.status(500).json({ success: false, message: 'Unable to verify parcel availability' });
+  }
+
   let connection;
   try {
     connection = await db.promise().getConnection();
     await connection.beginTransaction();
 
-    // 1. Insert into orders table
+    // 1. Calculate daily order sequence number
+    const [maxResult] = await connection.query(
+      'SELECT MAX(daily_order_number) as max_num FROM orders WHERE DATE(created_at) = CURDATE()'
+    );
+    const dailyOrderNumber = maxResult[0].max_num ? maxResult[0].max_num + 1 : 1;
+
+    // 2. Insert into orders table
     const [orderResult] = await connection.query(
-      'INSERT INTO orders (table_number, total_amount, customer_name, order_type) VALUES (?, ?, ?, ?)',
-      [table_number, total_amount, customer_name || null, order_type || 'Dine-in']
+      'INSERT INTO orders (daily_order_number, table_number, total_amount, customer_name, order_type) VALUES (?, ?, ?, ?, ?)',
+      [dailyOrderNumber, table_number, total_amount, customer_name || null, order_type || 'Dine-in']
     );
 
     const orderId = orderResult.insertId;
@@ -67,14 +87,15 @@ router.get('/admin/all', authMiddleware, async (req, res) => {
 
   const sql = `
     SELECT 
-      o.id, 
+      o.id,
+      o.daily_order_number,
       o.table_number, 
       o.customer_name,
       o.order_type,
       o.total_amount, 
       o.status, 
       o.created_at,
-      GROUP_CONCAT(CONCAT(IFNULL(m.item_name, 'Deleted Item'), '::', oi.quantity, '::', oi.price, '::', oi.id) SEPARATOR '||') as items_string
+      GROUP_CONCAT(CONCAT(IFNULL(m.item_name, 'Deleted Item'), '::', oi.quantity, '::', oi.price, '::', oi.id, '::', IFNULL(m.food_type, 'Veg'), '::', IFNULL(m.description, '')) SEPARATOR '||') as items_string
     FROM orders o
     LEFT JOIN order_items oi ON o.id = oi.order_id
     LEFT JOIN menu_items m ON oi.item_id = m.id
@@ -91,12 +112,15 @@ router.get('/admin/all', authMiddleware, async (req, res) => {
       let items = [];
       if (order.items_string) {
         items = order.items_string.split('||').map(itemStr => {
-          const [item_name, quantity, price, order_item_id] = itemStr.split('::');
+          let [item_name, quantity, price, order_item_id, food_type, ...descParts] = itemStr.split('::');
+          let description = descParts.join('::');
           return { 
             item_name, 
             quantity: parseInt(quantity), 
             price: parseFloat(price),
-            order_item_id: parseInt(order_item_id)
+            order_item_id: parseInt(order_item_id),
+            food_type,
+            description
           };
         });
       }
